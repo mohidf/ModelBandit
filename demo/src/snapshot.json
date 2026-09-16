@@ -1,31 +1,244 @@
 [
-  { "modelId": "gpt-4o-mini", "provider": "openai", "tier": "cheap", "taskType": "coding", "totalRequests": 6, "averageLatencyMs": 11500, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.00027 },
-  { "modelId": "meta-llama/llama-3.3-70b-instruct", "provider": "openrouter", "tier": "balanced", "taskType": "coding", "totalRequests": 5, "averageLatencyMs": 7393, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.00057 },
-  { "modelId": "meta-llama/llama-3.1-8b-instruct", "provider": "openrouter", "tier": "cheap", "taskType": "coding", "totalRequests": 6, "averageLatencyMs": 2454, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.00012 },
-  { "modelId": "gpt-4o", "provider": "openai", "tier": "premium", "taskType": "coding", "totalRequests": 3, "averageLatencyMs": 11328, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.01449 },
-
-  { "modelId": "meta-llama/llama-3.3-70b-instruct", "provider": "openrouter", "tier": "balanced", "taskType": "math", "totalRequests": 6, "averageLatencyMs": 4115, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0002 },
-  { "modelId": "qwen/qwen-2.5-72b-instruct", "provider": "openrouter", "tier": "balanced", "taskType": "math", "totalRequests": 3, "averageLatencyMs": 5200, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0009 },
-
-  { "modelId": "meta-llama/llama-3.1-8b-instruct", "provider": "openrouter", "tier": "cheap", "taskType": "creative", "totalRequests": 8, "averageLatencyMs": 2969, "averageConfidence": 1.0, "escalationRate": 0.10, "averageCostUsd": 0.0001 },
-  { "modelId": "meta-llama/llama-3.3-70b-instruct", "provider": "openrouter", "tier": "balanced", "taskType": "creative", "totalRequests": 2, "averageLatencyMs": 6100, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0005 },
-  { "modelId": "claude-haiku-4-5-20251001", "provider": "anthropic", "tier": "cheap", "taskType": "creative", "totalRequests": 2, "averageLatencyMs": 3900, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0004 },
-
-  { "modelId": "meta-llama/llama-3.1-8b-instruct", "provider": "openrouter", "tier": "cheap", "taskType": "general", "totalRequests": 4, "averageLatencyMs": 2129, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0001 },
-  { "modelId": "gpt-4o-mini", "provider": "openai", "tier": "cheap", "taskType": "general", "totalRequests": 1, "averageLatencyMs": 4800, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0002 },
-
-  { "modelId": "claude-haiku-4-5-20251001", "provider": "anthropic", "tier": "cheap", "taskType": "research", "totalRequests": 4, "averageLatencyMs": 6313, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0007 },
-  { "modelId": "claude-sonnet-4-6", "provider": "anthropic", "tier": "balanced", "taskType": "research", "totalRequests": 2, "averageLatencyMs": 9800, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0061 },
-  { "modelId": "meta-llama/llama-3.3-70b-instruct", "provider": "openrouter", "tier": "balanced", "taskType": "research", "totalRequests": 1, "averageLatencyMs": 7200, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0006 },
-
-  { "modelId": "claude-haiku-4-5-20251001", "provider": "anthropic", "tier": "cheap", "taskType": "summarization", "totalRequests": 5, "averageLatencyMs": 1541, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0001 },
-  { "modelId": "meta-llama/llama-3.1-8b-instruct", "provider": "openrouter", "tier": "cheap", "taskType": "summarization", "totalRequests": 4, "averageLatencyMs": 1900, "averageConfidence": 1.0, "escalationRate": 0.25, "averageCostUsd": 0.0001 },
-  { "modelId": "gpt-4o-mini", "provider": "openai", "tier": "cheap", "taskType": "summarization", "totalRequests": 1, "averageLatencyMs": 3100, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0002 },
-
-  { "modelId": "meta-llama/llama-3.3-70b-instruct", "provider": "openrouter", "tier": "balanced", "taskType": "vision", "totalRequests": 4, "averageLatencyMs": 8495, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0006 },
-  { "modelId": "meta-llama/llama-4-scout", "provider": "openrouter", "tier": "balanced", "taskType": "vision", "totalRequests": 2, "averageLatencyMs": 5100, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0003 },
-
-  { "modelId": "meta-llama/llama-3.3-70b-instruct", "provider": "openrouter", "tier": "balanced", "taskType": "coding_debug", "totalRequests": 5, "averageLatencyMs": 11808, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0006 },
-  { "modelId": "deepseek/deepseek-v3.2", "provider": "openrouter", "tier": "premium", "taskType": "coding_debug", "totalRequests": 2, "averageLatencyMs": 9400, "averageConfidence": 1.0, "escalationRate": 0.0, "averageCostUsd": 0.0011 },
-  { "modelId": "gpt-4o-mini", "provider": "openai", "tier": "cheap", "taskType": "coding_debug", "totalRequests": 1, "averageLatencyMs": 6000, "averageConfidence": 1.0, "escalationRate": 1.0, "averageCostUsd": 0.0002 }
+  {
+    "modelId": "meta-llama/llama-3.1-8b-instruct",
+    "provider": "openrouter",
+    "tier": "cheap",
+    "taskType": "coding",
+    "totalRequests": 6,
+    "averageLatencyMs": 7843,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000013
+  },
+  {
+    "modelId": "meta-llama/llama-3.1-8b-instruct",
+    "provider": "openrouter",
+    "tier": "cheap",
+    "taskType": "coding_debug",
+    "totalRequests": 7,
+    "averageLatencyMs": 5890,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000014
+  },
+  {
+    "modelId": "meta-llama/llama-3.1-8b-instruct",
+    "provider": "openrouter",
+    "tier": "cheap",
+    "taskType": "creative",
+    "totalRequests": 4,
+    "averageLatencyMs": 5285,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000012
+  },
+  {
+    "modelId": "deepseek/deepseek-v3.2",
+    "provider": "openrouter",
+    "tier": "premium",
+    "taskType": "creative",
+    "totalRequests": 2,
+    "averageLatencyMs": 4568,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000069
+  },
+  {
+    "modelId": "meta-llama/llama-4-scout",
+    "provider": "openrouter",
+    "tier": "balanced",
+    "taskType": "creative",
+    "totalRequests": 1,
+    "averageLatencyMs": 6925,
+    "averageConfidence": 1,
+    "escalationRate": 1,
+    "averageCostUsd": 0.00005
+  },
+  {
+    "modelId": "meta-llama/llama-3.1-8b-instruct",
+    "provider": "openrouter",
+    "tier": "cheap",
+    "taskType": "general",
+    "totalRequests": 3,
+    "averageLatencyMs": 977,
+    "averageConfidence": 1,
+    "escalationRate": 0.36,
+    "averageCostUsd": 0.000006
+  },
+  {
+    "modelId": "meta-llama/llama-3.3-70b-instruct",
+    "provider": "openrouter",
+    "tier": "balanced",
+    "taskType": "general",
+    "totalRequests": 2,
+    "averageLatencyMs": 17256,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000056
+  },
+  {
+    "modelId": "meta-llama/llama-3.3-70b-instruct",
+    "provider": "openrouter",
+    "tier": "balanced",
+    "taskType": "general_chat",
+    "totalRequests": 5,
+    "averageLatencyMs": 15381,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000035
+  },
+  {
+    "modelId": "meta-llama/llama-3.1-8b-instruct",
+    "provider": "openrouter",
+    "tier": "cheap",
+    "taskType": "general_chat",
+    "totalRequests": 3,
+    "averageLatencyMs": 3217,
+    "averageConfidence": 1,
+    "escalationRate": 0.16,
+    "averageCostUsd": 0.000011
+  },
+  {
+    "modelId": "meta-llama/llama-3.1-8b-instruct",
+    "provider": "openrouter",
+    "tier": "cheap",
+    "taskType": "math",
+    "totalRequests": 4,
+    "averageLatencyMs": 9450,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000013
+  },
+  {
+    "modelId": "openai/gpt-oss-20b",
+    "provider": "openrouter",
+    "tier": "cheap",
+    "taskType": "math",
+    "totalRequests": 4,
+    "averageLatencyMs": 2301,
+    "averageConfidence": 1,
+    "escalationRate": 0.36,
+    "averageCostUsd": 0.000023
+  },
+  {
+    "modelId": "meta-llama/llama-3.3-70b-instruct",
+    "provider": "openrouter",
+    "tier": "balanced",
+    "taskType": "math",
+    "totalRequests": 3,
+    "averageLatencyMs": 8428,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000056
+  },
+  {
+    "modelId": "meta-llama/llama-3.3-70b-instruct",
+    "provider": "openrouter",
+    "tier": "balanced",
+    "taskType": "math_reasoning",
+    "totalRequests": 3,
+    "averageLatencyMs": 5977,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000056
+  },
+  {
+    "modelId": "meta-llama/llama-3.1-8b-instruct",
+    "provider": "openrouter",
+    "tier": "cheap",
+    "taskType": "multilingual",
+    "totalRequests": 5,
+    "averageLatencyMs": 1907,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000007
+  },
+  {
+    "modelId": "meta-llama/llama-3.1-8b-instruct",
+    "provider": "openrouter",
+    "tier": "cheap",
+    "taskType": "research",
+    "totalRequests": 5,
+    "averageLatencyMs": 4756,
+    "averageConfidence": 1,
+    "escalationRate": 0.2,
+    "averageCostUsd": 0.000014
+  },
+  {
+    "modelId": "claude-haiku-4-5-20251001",
+    "provider": "anthropic",
+    "tier": "cheap",
+    "taskType": "research",
+    "totalRequests": 1,
+    "averageLatencyMs": 379,
+    "averageConfidence": 0,
+    "escalationRate": 1,
+    "averageCostUsd": 0
+  },
+  {
+    "modelId": "meta-llama/llama-3.3-70b-instruct",
+    "provider": "openrouter",
+    "tier": "balanced",
+    "taskType": "research",
+    "totalRequests": 1,
+    "averageLatencyMs": 3398,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000054
+  },
+  {
+    "modelId": "meta-llama/llama-3.1-8b-instruct",
+    "provider": "openrouter",
+    "tier": "cheap",
+    "taskType": "summarization",
+    "totalRequests": 3,
+    "averageLatencyMs": 5116,
+    "averageConfidence": 1,
+    "escalationRate": 0.2,
+    "averageCostUsd": 0.000009
+  },
+  {
+    "modelId": "meta-llama/llama-3.3-70b-instruct",
+    "provider": "openrouter",
+    "tier": "balanced",
+    "taskType": "summarization",
+    "totalRequests": 3,
+    "averageLatencyMs": 6061,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000026
+  },
+  {
+    "modelId": "meta-llama/llama-3.1-8b-instruct",
+    "provider": "openrouter",
+    "tier": "cheap",
+    "taskType": "vision",
+    "totalRequests": 3,
+    "averageLatencyMs": 4927,
+    "averageConfidence": 1,
+    "escalationRate": 0.2,
+    "averageCostUsd": 0.000014
+  },
+  {
+    "modelId": "meta-llama/llama-3.3-70b-instruct",
+    "provider": "openrouter",
+    "tier": "balanced",
+    "taskType": "vision",
+    "totalRequests": 3,
+    "averageLatencyMs": 16802,
+    "averageConfidence": 1,
+    "escalationRate": 0.2,
+    "averageCostUsd": 0.000049
+  },
+  {
+    "modelId": "deepseek/deepseek-v3.2",
+    "provider": "openrouter",
+    "tier": "premium",
+    "taskType": "vision",
+    "totalRequests": 2,
+    "averageLatencyMs": 7057,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000068
+  }
 ]

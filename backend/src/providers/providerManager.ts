@@ -171,6 +171,21 @@ export class ProviderManager {
     return null;
   }
 
+  /**
+   * Where to send a request when the resolved provider fails outright
+   * (timeout, auth error, out of credit): the domain's fallback provider at
+   * the same tier. Returns null when there is no different fallback provider.
+   */
+  fallback(resolved: ResolvedModel, domain: TaskDomain): ResolvedModel | null {
+    const { fallbackProviderName, reason } = this.routing[domain];
+    if (!fallbackProviderName || fallbackProviderName === resolved.provider.name) return null;
+    return this.build(
+      fallbackProviderName,
+      resolved.tier,
+      `Fallback to ${fallbackProviderName} after ${resolved.provider.name} failed: ${reason}`,
+    );
+  }
+
   // ── Dispatch ─────────────────────────────────────────────────────────────
 
   /**

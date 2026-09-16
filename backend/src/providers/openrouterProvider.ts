@@ -18,7 +18,9 @@ import type { ModelTier } from './types';
 import { MODEL_REGISTRY } from '../config/models';
 
 const BASE_URL   = 'https://openrouter.ai/api/v1';
-const TIMEOUT_MS = 30_000;
+// OpenRouter's larger models can take a while under load; a timeout is
+// treated as a provider failure and the router falls back (see router.ts).
+const TIMEOUT_MS = 60_000;
 
 // OpenRouter asks for these so the app shows up in their dashboard. Optional.
 const DEFAULT_HEADERS = {
@@ -68,8 +70,15 @@ export class OpenRouterProvider implements IProvider {
         { signal: controller.signal },
       );
 
+      // OpenRouter can answer 200 with an error body and no choices.
+      const choice = completion.choices?.[0];
+      if (!choice) {
+        const detail = (completion as unknown as { error?: { message?: string } }).error?.message ?? 'no choices in response';
+        throw new Error(`OpenRouterProvider [${model}]: ${detail}`);
+      }
+
       return {
-        text:            completion.choices[0]?.message.content ?? '',
+        text:            choice.message.content ?? '',
         inputTokens:     completion.usage?.prompt_tokens     ?? 0,
         outputTokens:    completion.usage?.completion_tokens ?? 0,
         latencyMs:       Date.now() - start,

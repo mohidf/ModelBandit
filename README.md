@@ -60,9 +60,10 @@ npm run backend:dev    # http://localhost:3000
 npm run frontend:dev   # http://localhost:5173, proxies /api to the backend
 ```
 
-Sign up in the browser, paste a provider key on the settings page, and send a
-prompt. Without a key, prompts go to a single free Groq model so you can still
-try it, but you won't see any routing.
+Sign up in the browser and send a prompt. A user with no saved keys gets the
+free Groq tier if the server has a Groq key, otherwise full routing on the
+server's own provider keys, so on your own machine you don't need to paste
+anything. Keys saved on the settings page take precedence over the server's.
 
 The keys that matter:
 
@@ -156,6 +157,13 @@ If classifier confidence came in below the threshold, the request runs again on
 the next tier up within the same provider, or on the fallback provider's premium
 tier if it was already at the top. Both calls are recorded and both are counted
 in the cost shown to the user.
+
+Escalation is about a weak answer. A provider that fails outright - a timeout,
+an expired key, an account out of credit - is handled separately: the request
+goes once to the task type's other provider at the same tier, and the model
+that failed is recorded with zero confidence so the scorer steers away from it
+until it recovers. I added this after my Anthropic account ran out of credit
+mid-run and every research prompt turned into a 500.
 
 The important detail is what gets recorded. The first call is marked as having
 escalated, which raises that model's escalation rate. Early on I weighted

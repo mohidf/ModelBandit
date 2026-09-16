@@ -122,14 +122,11 @@ export class RoutingEngine {
     const { domain, complexity, confidence } = classification;
     const effectiveComplexity = preferCost ? downgradedComplexity(complexity) : complexity;
     const decision = await strategyEngine.choose(domain, effectiveComplexity, overrideConfig);
-    const initial  = decision.resolved;
 
-    // 2. Execute initial request
-    const { result: initialResult, cost: initialCost } = await providerManager.dispatch(
-      initial,
-      prompt,
-      { maxTokens, userApiKeys },
-    );
+    // 2. Execute initial request (falls back to the domain's other provider if it fails)
+    const initialCall = await this.dispatchWithFallback(decision.resolved, domain, prompt, maxTokens, userApiKeys);
+    const initial = initialCall.resolved;
+    const { result: initialResult, cost: initialCost } = initialCall;
 
     // 3. Escalate if needed — records both attempts in PerformanceStore
     const { final, finalResult, finalCost, didEscalate } = await this.escalateIfNeeded({
@@ -222,15 +219,13 @@ export class RoutingEngine {
       const target = providerManager.escalate(p.initial, p.domain);
 
       if (target !== null) {
-        const final = {
+        const escalated = {
           ...target,
           reason: `Escalated (confidence ${p.confidence} < ${config.confidenceThreshold}): ${target.reason}`,
         };
-        const { result: finalResult, cost: finalCost } = await providerManager.dispatch(
-          final,
-          p.prompt,
-          { maxTokens: p.maxTokens, userApiKeys: p.userApiKeys },
-        );
+        const finalCall = await this.dispatchWithFallback(escalated, p.domain, p.prompt, p.maxTokens, p.userApiKeys);
+        const final = finalCall.resolved;
+        const { result: finalResult, cost: finalCost } = finalCall;
 
         // Record both attempts
         this.recordPerf(p.initial, p.initialResult, p.initialCost, p.domain, true);
@@ -243,6 +238,58 @@ export class RoutingEngine {
     // No escalation — record single initial attempt
     this.recordPerf(p.initial, p.initialResult, p.initialCost, p.domain, false);
     return { final: p.initial, finalResult: p.initialResult, finalCost: ZERO_COST, didEscalate: false };
+  }
+
+  // ── Provider failure fallback ─────────────────────────────────────────────
+
+  /**
+   * Call the resolved provider. If the call itself fails (timeout, auth
+   * error, out of credit, malformed response) rather than returning a weak
+   * answer, try the domain's fallback provider at the same tier once.
+   *
+   * The failed model is recorded with confidence 0 and escalated: true so its
+   * running averages take a hit and the strategy engine steers away from it
+   * until it recovers. If there is no fallback, or the fallback fails too,
+   * the original error is rethrown and the request returns 500.
+   */
+  private async dispatchWithFallback(
+    resolved:    ResolvedModel,
+    domain:      TaskDomain,
+    prompt:      string,
+    maxTokens:   number,
+    userApiKeys: Record<string, string>,
+  ): Promise<{ resolved: ResolvedModel; result: GenerateResult; cost: CostEstimate }> {
+    const start = Date.now();
+    try {
+      const { result, cost } = await providerManager.dispatch(resolved, prompt, { maxTokens, userApiKeys });
+      return { resolved, result, cost };
+    } catch (err) {
+      const alt = providerManager.fallback(resolved, domain);
+      const message = err instanceof Error ? err.message : String(err);
+      if (!alt) throw err;
+
+      logger.warn('Provider call failed, using fallback provider', {
+        domain, model: resolved.model, provider: resolved.provider.name,
+        fallback: alt.provider.name, error: message,
+      });
+      this.recordFailure(resolved, domain, Date.now() - start);
+
+      const { result, cost } = await providerManager.dispatch(alt, prompt, { maxTokens, userApiKeys });
+      return { resolved: { ...alt, reason: `${alt.reason} (${message.slice(0, 120)})` }, result, cost };
+    }
+  }
+
+  private recordFailure(resolved: ResolvedModel, domain: TaskDomain, latencyMs: number): void {
+    performanceStore.recordResult({
+      modelId:    resolved.model,
+      provider:   resolved.provider.name,
+      tier:       resolved.tier,
+      taskType:   domain,
+      latencyMs,
+      confidence: 0,
+      escalated:  true,
+      costUsd:    0,
+    }).catch(err => logger.error('PerformanceStore write failed', { err: String(err) }));
   }
 
   // ── Phase 4: aggregate metrics ────────────────────────────────────────────

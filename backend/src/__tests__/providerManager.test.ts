@@ -255,3 +255,36 @@ describe('ProviderManager — escalate()', () => {
   });
 
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. fallback() — same tier, the domain's other provider
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('ProviderManager — fallback()', () => {
+
+  it('returns the fallback provider at the same tier', () => {
+    const manager = buildManager();
+    const resolved = manager.resolve('coding', 'medium');   // alpha, balanced
+    const alt = manager.fallback(resolved, 'coding');
+    expect(alt).not.toBeNull();
+    expect(alt!.provider.name).toBe('beta');
+    expect(alt!.tier).toBe('balanced');
+    expect(alt!.model).toBe('beta-std');
+    expect(alt!.reason).toMatch(/alpha failed/);
+  });
+
+  it('returns null when the domain has no fallback provider', () => {
+    const manager = buildManager();
+    const resolved = manager.resolve('creative', 'low');    // alpha, no fallback
+    expect(manager.fallback(resolved, 'creative')).toBeNull();
+  });
+
+  it('returns null when the fallback is the provider that just failed', () => {
+    const manager = buildManager();
+    // math routes to beta with alpha as fallback; if alpha itself failed (say,
+    // after an escalation moved us there), there is nowhere else to go.
+    const onAlpha = manager.resolveExplicit('alpha', 'premium', 'test');
+    expect(manager.fallback(onAlpha, 'math')).toBeNull();
+  });
+
+});
