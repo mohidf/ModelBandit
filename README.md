@@ -12,9 +12,15 @@ The name is from the multi-armed bandit problem: every model is an arm, every
 request is a pull, and the router balances exploiting the arm that's paid off
 best so far against exploring the others. That's the epsilon-greedy part below.
 
-## Try it in your browser
+## Try it
 
-**[mohidf.github.io/ModelBandit](https://mohidf.github.io/ModelBandit/)**
+**[modelbandit.up.railway.app](https://modelbandit.up.railway.app/)** is the
+full app: sign up, send a prompt, and it classifies it, picks a model, calls
+it through OpenRouter, and shows you the decision next to the answer. It's
+running on a free Railway instance and the cheap models take a few seconds.
+
+**[mohidf.github.io/ModelBandit](https://mohidf.github.io/ModelBandit/)** is
+the browser demo, for when you just want to see the decision logic.
 
 Type a prompt and it shows what the router would do with it: which task type
 the regexes voted for and why, how confident that vote was, and which model
@@ -24,7 +30,7 @@ against a snapshot of my performance table. No server, no keys.
 
 Two things it can't do: ambiguous prompts on the real server go on to an
 embedding step that needs an OpenAI key, and it doesn't call a model, so
-you get the decision but not the answer. The full app below does both.
+you get the decision but not the answer. The full app does both.
 
 Each request goes through four steps:
 
@@ -90,7 +96,8 @@ docker build -t modelbandit .
 docker run -p 3000:3000 --env-file backend/.env modelbandit
 ```
 
-`railway.json` points Railway at that Dockerfile. On any host, set the same
+`railway.json` points Railway at that Dockerfile; that's what serves
+modelbandit.up.railway.app. On any host, set the same
 variables as `backend/.env`, plus `BETTER_AUTH_URL` and `ALLOWED_ORIGIN` to the
 public URL (for example `https://modelbandit.up.railway.app`), and run
 `npm run db:migrate` once against the database. The GitHub Pages site is
