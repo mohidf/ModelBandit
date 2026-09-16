@@ -15,7 +15,8 @@
           Type a prompt and see what the router does with it: what kind of task it thinks it is,
           which regex signals fired, and which model it would send it to and why. This is the
           server's actual classifier and scoring code bundled for the browser. Nothing is sent
-          anywhere. <a href="https://github.com/mohidf/ModelBandit">Code and writeup on GitHub.</a>
+          anywhere. <a href="https://modelbandit.up.railway.app/">The full app</a> calls the model too and
+          learns from every request. <a href="https://github.com/mohidf/ModelBandit">Code and writeup on GitHub.</a>
         </p>
       </header>
 
@@ -41,6 +42,7 @@
           Two things differ from the live server. Ambiguous prompts there go on to an embedding
           step that needs an API key, so this page stops after the rule stage. And the model
           history here is a snapshot of my performance table rather than the live one.
+          <a href="https://modelbandit.up.railway.app/">The full app</a> has neither limitation.
         </p>
       </footer>
     </main>
