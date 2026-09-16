@@ -13,7 +13,8 @@
     "test:coverage": "jest --coverage",
     "test:db": "ts-node src/scripts/testConnection.ts",
     "benchmark": "ts-node src/scripts/benchmark.ts",
-    "reset:stats": "ts-node src/scripts/resetStats.ts"
+    "reset:stats": "ts-node src/scripts/resetStats.ts",
+    "export:snapshot": "ts-node src/scripts/exportSnapshot.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

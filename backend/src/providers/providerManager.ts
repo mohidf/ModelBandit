@@ -16,25 +16,9 @@ import type { IProvider, GenerateOptions, GenerateResult, CostEstimate } from '.
 import type { TaskDomain, TaskComplexity, ModelTier } from './types';
 import { getModelById } from '../config/models';
 
-// ---------------------------------------------------------------------------
-// Complexity → tier mapping
-// ---------------------------------------------------------------------------
+import { COMPLEXITY_TO_TIER, type DomainRoute, type RoutingConfig } from '../config/routing';
 
-/**
- * Maps task complexity (classifier output) to provider tier (capability level).
- *
- * High complexity maps to `balanced` (not `premium`) so the strategy engine
- * accumulates data for balanced-tier models on first encounters. If classifier
- * confidence falls below `CONFIDENCE_THRESHOLD`, the escalation path promotes
- * to premium automatically. This prevents the cold-start problem where every
- * domain seeds only premium data, causing the strategy engine to exploit
- * premium indefinitely before cheaper tiers are discovered.
- */
-const COMPLEXITY_TO_TIER: Record<TaskComplexity, ModelTier> = {
-  low:    'cheap',
-  medium: 'balanced',
-  high:   'balanced',  // escalation promotes to premium when confidence is low
-};
+export type { DomainRoute, RoutingConfig };
 
 function complexityToTier(complexity: TaskComplexity): ModelTier {
   return COMPLEXITY_TO_TIER[complexity];
@@ -62,34 +46,6 @@ export interface ModelTierMap {
   balanced: string;
   premium:  string;
 }
-
-// ---------------------------------------------------------------------------
-// Routing configuration — one entry per domain, provider-name only
-// ---------------------------------------------------------------------------
-
-/**
- * A single routing decision: which registered provider to use for a domain,
- * plus an optional fallback provider for cross-provider escalation.
- *
- * - providerName: used for all complexity levels in this domain
- * - fallbackProviderName: used only when already at premium and confidence is
- *   still below threshold (cross-provider escalation)
- * - reason: shown to the caller explaining why this provider was chosen
- */
-export interface DomainRoute {
-  /** Must match IProvider.name of a registered provider. */
-  providerName: string;
-  /**
-   * Provider to escalate to when already at premium and confidence is low.
-   * If omitted or the same as providerName, cross-provider escalation is skipped.
-   */
-  fallbackProviderName?: string;
-  /** Shown to the caller explaining why this provider was chosen. */
-  reason: string;
-}
-
-/** Full routing table passed to the ProviderManager constructor. */
-export type RoutingConfig = Record<TaskDomain, DomainRoute>;
 
 // ---------------------------------------------------------------------------
 // Outputs

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ModelRouter demo</title>
+    <meta name="description" content="Type a prompt and see how ModelRouter classifies it and which model it would send it to. The real classifier and scoring code, running in your browser." />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  </head>
+  <body>
+    <main id="app">
+      <header class="intro">
+        <h1>ModelRouter</h1>
+        <p>
+          Type a prompt and see what the router does with it: what kind of task it thinks it is,
+          which regex signals fired, and which model it would send it to and why. This is the
+          server's actual classifier and scoring code bundled for the browser. Nothing is sent
+          anywhere. <a href="https://github.com/mohidf/ModelRouter">Code and writeup on GitHub.</a>
+        </p>
+      </header>
+
+      <section class="input">
+        <label for="prompt" class="visually-hidden">Prompt</label>
+        <textarea id="prompt" rows="4" placeholder="Type a prompt, or pick an example below." spellcheck="false"></textarea>
+        <div class="controls">
+          <label class="inline">Prefer
+            <select id="mode">
+              <option value="balanced">Balanced</option>
+              <option value="cost">Cheapest that works</option>
+              <option value="quality">Best answer</option>
+            </select>
+          </label>
+          <span class="examples" id="examples"></span>
+        </div>
+      </section>
+
+      <section id="out" class="out" aria-live="polite"></section>
+
+      <footer class="foot">
+        <p>
+          Two things differ from the live server. Ambiguous prompts there go on to an embedding
+          step that needs an API key, so this page stops after the rule stage. And the model
+          history here is a snapshot of my performance table rather than the live one.
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

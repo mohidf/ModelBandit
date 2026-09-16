@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": []
+  },
+  "include": [
+    "src",
+    "../backend/src/services/classifier.ts",
+    "../backend/src/services/scoring.ts",
+    "../backend/src/config/models.ts",
+    "../backend/src/config/routing.ts",
+    "../backend/src/providers/types.ts"
+  ]
+}

@@ -150,6 +150,21 @@ const COMPLEXITY_SIGNALS: ComplexitySignal[] = [
 // Rule-based implementation
 // ---------------------------------------------------------------------------
 
+/** Per-domain breakdown of which signals fired, for explaining a decision. */
+export interface DomainExplanation {
+  domain:  SpecificDomain;
+  score:   number;
+  matched: string[];
+}
+
+export interface ClassificationExplanation {
+  result:        ClassificationResult;
+  explainIntent: boolean;
+  domains:       DomainExplanation[];
+  wordCount:     number;
+  complexityPoints: number;
+}
+
 export class RuleBasedClassifier implements IClassifier {
   async classify(prompt: string): Promise<ClassificationResult> {
     const { domain, confidence } = this.scoreDomain(prompt);
@@ -157,6 +172,38 @@ export class RuleBasedClassifier implements IClassifier {
     const estimatedTokens = Math.ceil(prompt.length / 4);
 
     return { domain, complexity, confidence, estimatedTokens };
+  }
+
+  /**
+   * Same decision as classify(), plus the evidence: every domain's score and
+   * the source text of each regex that matched. Used by the browser demo.
+   */
+  explain(prompt: string): ClassificationExplanation {
+    const { domain, confidence } = this.scoreDomain(prompt);
+    const complexity = this.scoreComplexity(prompt);
+    const lower = prompt.toLowerCase();
+    const wordCount = prompt.trim().split(/\s+/).length;
+
+    const domains = (Object.keys(DOMAIN_SIGNALS) as SpecificDomain[])
+      .map(d => ({
+        domain:  d,
+        score:   this.sumSignals(prompt, DOMAIN_SIGNALS[d]),
+        matched: DOMAIN_SIGNALS[d].filter(s => s.pattern.test(prompt)).map(s => s.pattern.source),
+      }))
+      .filter(d => d.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    const complexityPoints = COMPLEXITY_SIGNALS.reduce(
+      (sum, signal) => sum + (signal.test(lower, wordCount) ? signal.points : 0), 0,
+    );
+
+    return {
+      result: { domain, complexity, confidence, estimatedTokens: Math.ceil(prompt.length / 4) },
+      explainIntent: this.isExplainIntent(prompt),
+      domains,
+      wordCount,
+      complexityPoints,
+    };
   }
 
   private scoreDomain(prompt: string): { domain: TaskDomain; confidence: number } {

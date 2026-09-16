@@ -1,0 +1,16 @@
+{
+  "name": "model-router-demo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Browser demo of the router's decision logic, published to GitHub Pages.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p . && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  }
+}
