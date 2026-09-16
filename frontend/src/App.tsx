@@ -123,7 +123,7 @@ function PromptPage({ onRouted }: PromptPageProps) {
       {result?.freeTier && (
         <p className="note">
           You have no API keys saved, so this ran on Groq's free tier with a single fixed model.
-          <Link to="/settings"> Add a key</Link> to get routing across OpenAI, Anthropic and Together AI.
+          <Link to="/settings"> Add a key</Link> to get routing across OpenRouter, OpenAI and Anthropic.
         </p>
       )}
 

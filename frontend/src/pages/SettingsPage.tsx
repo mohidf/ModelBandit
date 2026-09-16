@@ -10,7 +10,7 @@ interface RowState { value: string; busy: boolean; message: string | null; faile
 const PROVIDERS: { id: string; label: string; note: string }[] = [
   { id: 'openai',    label: 'OpenAI',      note: 'Also used for the embedding step of the classifier.' },
   { id: 'anthropic', label: 'Anthropic',   note: 'Claude models. Used for research and as an escalation target.' },
-  { id: 'together',  label: 'Together AI', note: 'Qwen, Llama and DeepSeek. The default for most task types.' },
+  { id: 'openrouter', label: 'OpenRouter',  note: 'Llama, Qwen and DeepSeek through one key. The default for most task types.' },
 ];
 
 const EMPTY: RowState = { value: '', busy: false, message: null, failed: false };

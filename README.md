@@ -36,7 +36,7 @@ Each request goes through four steps:
 The backend is Node and TypeScript on Express, with Postgres (on Neon, through
 Drizzle) for the performance history and Better Auth for accounts. The frontend
 is React. There are three
-real providers wired up - Together AI, OpenAI and Anthropic - plus Groq for a
+real providers wired up - OpenRouter, OpenAI and Anthropic - plus Groq for a
 free tier when a user hasn't added any keys of their own.
 
 ## Running it
@@ -70,7 +70,7 @@ The keys that matter:
 |---|---|
 | `DATABASE_URL` | required - a Postgres connection string |
 | `BETTER_AUTH_SECRET` | required - random string that signs session cookies |
-| `TOGETHER_API_KEY` | the default provider for most task types |
+| `OPENROUTER_API_KEY` | the default provider for most task types: Llama, Qwen and DeepSeek through one key |
 | `OPENAI_API_KEY` | GPT-4o as a fallback, and the embedding step of the classifier |
 | `ANTHROPIC_API_KEY` | Claude, used for research and as an escalation target |
 | `GROQ_API_KEY` | free tier for users with no keys of their own |
@@ -204,8 +204,8 @@ answer plus everything that went into the decision:
 {
   "response": "...",
   "classification": { "domain": "coding", "complexity": "low", "confidence": 0.94, "estimatedTokens": 12 },
-  "initialModel":   { "provider": "together", "model": "Qwen/Qwen2.5-7B-Instruct-Turbo", "tier": "cheap", "reason": "..." },
-  "finalModel":     { "provider": "together", "model": "Qwen/Qwen2.5-7B-Instruct-Turbo", "tier": "cheap", "reason": "..." },
+  "initialModel":   { "provider": "openrouter", "model": "meta-llama/llama-3.1-8b-instruct", "tier": "cheap", "reason": "..." },
+  "finalModel":     { "provider": "openrouter", "model": "meta-llama/llama-3.1-8b-instruct", "tier": "cheap", "reason": "..." },
   "escalated": false,
   "strategyMode": "exploitation",
   "latencyMs": 1842,
@@ -260,7 +260,7 @@ backend/src/
   providers/
     baseProvider.ts            the interface every provider implements
     providerManager.ts         registry, static routing table, escalation logic
-    togetherProvider.ts        \
+    openrouterProvider.ts      \
     openaiProvider.ts           | one file per provider
     claudeProvider.ts           |
     groqProvider.ts            /  free tier only
@@ -288,9 +288,12 @@ docs/                          longer notes on the routing strategy, learning, a
 
 ## Things I learned the hard way
 
-- Together AI's plain model IDs (`Qwen2.5-7B-Instruct`) return HTTP 400 on the
-  normal endpoint. You need the `-Turbo` variants; the others are for dedicated
-  endpoints only. This cost me an evening.
+- I started with Together AI as the open-weight provider. First their plain
+  model IDs returned HTTP 400 because only the `-Turbo` variants are serverless,
+  which cost me an evening. Then they withdrew the 7B model the cheap tier
+  depended on and every request 500'd. Now the open-weight models go through
+  OpenRouter, which routes each model ID to whichever host is up, so a single
+  vendor dropping a model isn't my problem any more.
 - Mapping "high complexity" straight to the premium tier meant the first request
   for every task type seeded the database with premium-only data, and from then
   on the router exploited premium forever because nothing else had a score. High

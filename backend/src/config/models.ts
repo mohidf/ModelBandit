@@ -11,7 +11,7 @@
 
 import type { TaskDomain, ModelTier } from '../providers/types';
 
-export type ProviderName = 'openai' | 'anthropic' | 'together';
+export type ProviderName = 'openai' | 'anthropic' | 'openrouter';
 
 export interface ModelDescriptor {
   /** Canonical API model string (e.g. "meta-llama/Llama-3.3-70B-Instruct"). */
@@ -82,62 +82,82 @@ export const MODEL_REGISTRY: readonly ModelDescriptor[] = [
     strengths:       ['creative', 'research', 'multilingual', 'coding'],
   },
 
-  // ── Together AI — fast / cheap path ───────────────────────────────────────
+  // ── OpenRouter ────────────────────────────────────────────────────────────
   //
-  // Use the "-Turbo" suffix variants — these are Together's serverless
-  // (pay-per-token) models available on the standard API endpoint.
-  // Non-Turbo model IDs (e.g. Mistral-7B-v0.3, Qwen2.5-7B) require
-  // Together's Dedicated Endpoints and return HTTP 400 on the standard API.
-
-  // ── Together AI — balanced path ───────────────────────────────────────────
+  // Open-weight models through one key. IDs and prices are OpenRouter's
+  // (https://openrouter.ai/models). Prices are per 1 000 tokens, USD.
 
   {
-    id:              'Qwen/Qwen2.5-7B-Instruct-Turbo',
-    provider:        'together',
-    displayName:     'Qwen 2.5 7B Turbo',
-    tier:            'balanced',
-    costPer1kTokens: { input: 0.0003, output: 0.0003 },
-    contextWindow:   32_768,
-    strengths:       ['summarization', 'multilingual', 'general'],
+    id:              'meta-llama/llama-3.1-8b-instruct',
+    provider:        'openrouter',
+    displayName:     'Llama 3.1 8B',
+    tier:            'cheap',
+    costPer1kTokens: { input: 0.00005, output: 0.00008 },
+    contextWindow:   131_072,
+    strengths:       ['general_chat', 'general', 'summarization'],
   },
   {
-    id:              'meta-llama/Llama-4-Maverick-17B-128E-Instruct',
-    provider:        'together',
-    displayName:     'Llama 4 Maverick 17B',
+    id:              'openai/gpt-oss-20b',
+    provider:        'openrouter',
+    displayName:     'GPT-OSS 20B',
+    tier:            'cheap',
+    costPer1kTokens: { input: 0.00003, output: 0.00013 },
+    contextWindow:   131_072,
+    strengths:       ['general', 'summarization', 'coding'],
+  },
+  {
+    id:              'meta-llama/llama-3.3-70b-instruct',
+    provider:        'openrouter',
+    displayName:     'Llama 3.3 70B',
     tier:            'balanced',
-    costPer1kTokens: { input: 0.0002, output: 0.0002 },
-    contextWindow:   1_048_576,
+    costPer1kTokens: { input: 0.0001, output: 0.00032 },
+    contextWindow:   131_072,
+    strengths:       ['general', 'creative', 'math_reasoning', 'research'],
+  },
+  {
+    id:              'qwen/qwen-2.5-72b-instruct',
+    provider:        'openrouter',
+    displayName:     'Qwen 2.5 72B',
+    tier:            'balanced',
+    costPer1kTokens: { input: 0.00036, output: 0.0004 },
+    contextWindow:   32_768,
+    strengths:       ['math', 'multilingual', 'coding'],
+  },
+  {
+    id:              'meta-llama/llama-4-scout',
+    provider:        'openrouter',
+    displayName:     'Llama 4 Scout',
+    tier:            'balanced',
+    costPer1kTokens: { input: 0.0001, output: 0.0003 },
+    contextWindow:   1_310_720,
     strengths:       ['vision', 'general'],
   },
-
-  // ── Together AI — premium path ────────────────────────────────────────────
-
   {
-    id:              'Qwen/Qwen2.5-72B-Instruct-Turbo',
-    provider:        'together',
-    displayName:     'Qwen 2.5 72B Turbo',
+    id:              'deepseek/deepseek-v3.2',
+    provider:        'openrouter',
+    displayName:     'DeepSeek V3.2',
     tier:            'premium',
-    costPer1kTokens: { input: 0.0012, output: 0.0012 },
-    contextWindow:   131_072,
-    strengths:       ['math', 'math_reasoning', 'multilingual'],
+    costPer1kTokens: { input: 0.000269, output: 0.0004 },
+    contextWindow:   163_840,
+    strengths:       ['coding', 'coding_debug', 'math', 'math_reasoning'],
   },
   {
-    id:              'meta-llama/Llama-3.3-70B-Instruct-Turbo',
-    provider:        'together',
-    displayName:     'Llama 3.3 70B Turbo',
+    id:              'qwen/qwen3-235b-a22b',
+    provider:        'openrouter',
+    displayName:     'Qwen3 235B',
     tier:            'premium',
-    costPer1kTokens: { input: 0.00088, output: 0.00088 },
+    costPer1kTokens: { input: 0.000455, output: 0.00182 },
     contextWindow:   131_072,
-    strengths:       ['general', 'research', 'math_reasoning'],
+    strengths:       ['math_reasoning', 'multilingual', 'research'],
   },
   {
-    id:              'deepseek-ai/DeepSeek-V3',
-    provider:        'together',
-    displayName:     'DeepSeek V3',
+    id:              'meta-llama/llama-4-maverick',
+    provider:        'openrouter',
+    displayName:     'Llama 4 Maverick',
     tier:            'premium',
-    costPer1kTokens: { input: 0.00125, output: 0.00125 },
-    contextWindow:   131_072,
-    strengths:       ['coding', 'math', 'research'],
+    costPer1kTokens: { input: 0.000188, output: 0.000652 },
+    contextWindow:   1_048_576,
+    strengths:       ['vision', 'general', 'research'],
   },
 ];
 

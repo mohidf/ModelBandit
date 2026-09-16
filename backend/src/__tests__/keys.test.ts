@@ -194,7 +194,7 @@ describe('POST /keys', () => {
   });
 
   it('accepts all valid provider values', async () => {
-    const validProviders = ['openai', 'anthropic', 'together', 'google', 'cohere'];
+    const validProviders = ['openai', 'anthropic', 'openrouter'];
     for (const provider of validProviders) {
       setupUpsertMock();
       const res = await request(app)

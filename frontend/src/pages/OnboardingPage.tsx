@@ -16,8 +16,8 @@ export function OnboardingPage() {
       <div className="auth-card">
         <h1>You're in</h1>
         <p className="muted" style={{ marginTop: 8 }}>
-          Without any API keys, prompts go to a single free model on Groq. Add your own OpenAI, Anthropic or
-          Together AI key and the router will choose between them per request.
+          Without any API keys, prompts go to a single free model on Groq. Add your own OpenRouter, OpenAI or
+          Anthropic key and the router will choose between them per request.
         </p>
         <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
           <button className="btn btn-primary" onClick={() => finish('/settings')}>Add API keys</button>

@@ -156,7 +156,7 @@ describe('ProviderManager — resolveByModelId()', () => {
   it('resolves a real model from the registry', () => {
     // Use a real registered provider so the manager can find it.
     // The manager in this test only has 'alpha' and 'beta', but resolveByModelId
-    // looks up the model in MODEL_REGISTRY which references 'openai'/'anthropic'/'together'.
+    // looks up the model in MODEL_REGISTRY which references 'openai'/'anthropic'/'openrouter'.
     // We use a separate manager with real providers wired up for this test.
     //
     // Rather than importing real providers (which would require API keys),

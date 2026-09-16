@@ -27,7 +27,7 @@ const DOMAIN_LABEL: Record<TaskDomain, string> = {
   summarization: 'summarization', vision: 'vision', multilingual: 'multilingual',
 };
 const TIER_LABEL: Record<ModelTier, string> = { cheap: 'cheap', balanced: 'mid', premium: 'premium' };
-const PROVIDER_LABEL: Record<string, string> = { openai: 'OpenAI', anthropic: 'Anthropic', together: 'Together AI' };
+const PROVIDER_LABEL: Record<string, string> = { openai: 'OpenAI', anthropic: 'Anthropic', openrouter: 'OpenRouter' };
 
 const EXAMPLES = [
   'Write a TypeScript function that debounces API calls with a configurable delay',

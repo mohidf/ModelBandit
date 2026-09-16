@@ -56,70 +56,70 @@ export const PROVIDER_TIERS: Record<string, Record<ModelTier, string>> = {
     balanced: 'claude-sonnet-4-6',
     premium:  'claude-opus-4-6',
   },
-  together: {
-    cheap:    'Qwen/Qwen2.5-7B-Instruct-Turbo',
-    balanced: 'Qwen/Qwen2.5-7B-Instruct-Turbo',
-    premium:  'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+  openrouter: {
+    cheap:    'meta-llama/llama-3.1-8b-instruct',
+    balanced: 'meta-llama/llama-3.3-70b-instruct',
+    premium:  'deepseek/deepseek-v3.2',
   },
 };
 
-// Together AI is the default provider for most domains (open-source models,
+// OpenRouter is the default provider for most domains (open-weight models,
 // strong cost efficiency). OpenAI and Anthropic remain as fallbacks and
 // primary providers for domains where they clearly excel.
 export const ROUTING: RoutingConfig = {
   coding: {
-    providerName:         'together',
+    providerName:         'openrouter',
     fallbackProviderName: 'openai',
-    reason: 'Together Qwen Coder / DeepSeek Coder for structured code generation',
+    reason: 'OpenRouter Llama / DeepSeek for structured code generation',
   },
   math: {
-    providerName:         'together',
+    providerName:         'openrouter',
     fallbackProviderName: 'openai',
-    reason: 'Together Qwen 72B for mathematical reasoning',
+    reason: 'OpenRouter Llama 70B / DeepSeek for mathematical reasoning',
   },
   creative: {
-    providerName:         'together',
+    providerName:         'openrouter',
     fallbackProviderName: 'anthropic',
-    reason: 'Together Llama 3.3 70B / Qwen 2.5 7B for creative writing',
+    reason: 'OpenRouter Llama 3.3 70B / Llama 3.1 8B for creative writing',
   },
   general: {
-    providerName:         'together',
+    providerName:         'openrouter',
     fallbackProviderName: 'openai',
-    reason: 'Together Qwen 2.5 7B for cost-efficient general-purpose queries',
+    reason: 'OpenRouter Llama 3.1 8B for cost-efficient general-purpose queries',
   },
   research: {
     providerName:         'anthropic',
-    fallbackProviderName: 'together',
+    fallbackProviderName: 'openrouter',
     reason: 'Claude excels at long-context research synthesis and citations',
   },
   summarization: {
-    providerName:         'together',
+    providerName:         'openrouter',
     fallbackProviderName: 'openai',
-    reason: 'Together Qwen 2.5 7B for cost-effective text compression',
+    reason: 'OpenRouter Llama 3.1 8B for cost-effective text compression',
   },
   vision: {
-    providerName:         'together',
+    providerName:         'openrouter',
     fallbackProviderName: 'openai',
-    reason: 'Together Llama 4 Maverick for image and visual understanding',
+    reason: 'OpenRouter Llama 4 Scout / Maverick for image and visual understanding',
   },
   coding_debug: {
-    providerName:         'together',
+    providerName:         'openrouter',
     fallbackProviderName: 'openai',
-    reason: 'Together Qwen Coder / DeepSeek Coder for debugging and error analysis',
+    reason: 'OpenRouter DeepSeek / Llama 70B for debugging and error analysis',
   },
   general_chat: {
-    providerName:         'together',
+    providerName:         'openrouter',
     fallbackProviderName: 'openai',
-    reason: 'Together Qwen 2.5 7B for low-latency conversational queries',
+    reason: 'OpenRouter Llama 3.1 8B for low-latency conversational queries',
   },
   multilingual: {
-    providerName:         'together',
+    providerName:         'openrouter',
     fallbackProviderName: 'anthropic',
-    reason: 'Together Qwen 72B with strong multilingual capabilities',
+    reason: 'OpenRouter Qwen 72B / Llama 70B with strong multilingual capabilities',
   },
   math_reasoning: {
-    providerName:         'together',
+    providerName:         'openrouter',
     fallbackProviderName: 'openai',
-    reason: 'Together Llama 3.3 70B for chain-of-thought mathematical reasoning',
+    reason: 'OpenRouter Llama 3.3 70B / DeepSeek for chain-of-thought mathematical reasoning',
   },
 };

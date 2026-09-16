@@ -12,7 +12,7 @@
  * Prerequisites:
  *   - Backend running at http://localhost:3000 (or set $BENCHMARK_URL)
  *   - OPENAI_API_KEY in backend/.env  (embedding classifier; falls back to rule-based without it)
- *   - At least one provider API key (ANTHROPIC_API_KEY / TOGETHER_API_KEY / OPENAI_API_KEY)
+ *   - At least one provider API key (ANTHROPIC_API_KEY / OPENROUTER_API_KEY / OPENAI_API_KEY)
  *
  * Usage:
  *   cd backend
@@ -20,7 +20,7 @@
  *   BENCHMARK_URL=http://staging.example.com ts-node src/scripts/benchmark.ts
  *
  * Expected runtime: ~3–6 minutes (50 sequential API calls, 500 ms delay between each)
- * Expected cost:    ~$0.01–0.05 (mostly cheap-tier Together / Haiku models)
+ * Expected cost:    ~$0.01–0.05 (mostly cheap-tier OpenRouter / Haiku models)
  */
 
 // ---------------------------------------------------------------------------
@@ -541,12 +541,15 @@ function printSummary(results: BenchmarkResult[], wallMs: number): void {
     'claude-haiku-4-5-20251001':                     'Claude Haiku',
     'claude-sonnet-4-6':                             'Claude Sonnet',
     'claude-opus-4-6':                               'Claude Opus',
-    // Together AI — serverless (Turbo) variants in active registry
-    'Qwen/Qwen2.5-7B-Instruct-Turbo':               'Qwen 2.5 7B Turbo',
-    'Qwen/Qwen2.5-72B-Instruct-Turbo':              'Qwen 2.5 72B Turbo',
-    'meta-llama/Llama-3.3-70B-Instruct-Turbo':      'Llama 3.3 70B Turbo',
-    'meta-llama/Llama-4-Maverick-17B-128E-Instruct': 'Llama 4 Maverick',
-    'deepseek-ai/DeepSeek-V3':                       'DeepSeek V3',
+    // OpenRouter
+    'meta-llama/llama-3.1-8b-instruct':              'Llama 3.1 8B',
+    'openai/gpt-oss-20b':                            'GPT-OSS 20B',
+    'meta-llama/llama-3.3-70b-instruct':             'Llama 3.3 70B',
+    'qwen/qwen-2.5-72b-instruct':                    'Qwen 2.5 72B',
+    'meta-llama/llama-4-scout':                      'Llama 4 Scout',
+    'deepseek/deepseek-v3.2':                        'DeepSeek V3.2',
+    'qwen/qwen3-235b-a22b':                          'Qwen3 235B',
+    'meta-llama/llama-4-maverick':                   'Llama 4 Maverick',
   };
 
   const modelCounts: Record<string, { calls: number; tier: string; totalCost: number; totalLatency: number }> = {};
@@ -656,7 +659,7 @@ function printInterpretation(p: InterpretationParams): void {
   ② Cost savings vs GPT-4o: ${p.savingsPct.toFixed(1)}%  →  ${costStatus}
 
      TARGET NUMBERS:
-       ≥ 65%  Router directing easy tasks to cheap/balanced tiers. Typical Together/Haiku range.
+       ≥ 65%  Router directing easy tasks to cheap/balanced tiers. Typical OpenRouter/Haiku range.
        45–65% Mixed. Some domains legitimately hit premium (research, coding_debug).
        < 45%  Review ROUTING table in providers/index.ts — many tasks may map to premium providers.
 
@@ -666,7 +669,7 @@ function printInterpretation(p: InterpretationParams): void {
 
   // ── Latency ───────────────────────────────────────────────────────────────
   const latStatus =
-    p.avgLatencyMs <= 1500 ? '✓ FAST — Together cheap-tier models responding well' :
+    p.avgLatencyMs <= 1500 ? '✓ FAST — cheap-tier models responding well' :
     p.avgLatencyMs <= 3000 ? '~ ACCEPTABLE' :
     p.avgLatencyMs <= 5000 ? '△ SLOW — many requests hitting premium or escalation' :
                              '✗ VERY SLOW — check provider rate limits or network issues';
