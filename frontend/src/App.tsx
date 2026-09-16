@@ -1,175 +1,113 @@
-import { useState, useEffect, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, Link, NavLink, useNavigate } from 'react-router-dom';
 import PromptCard from './components/PromptCard';
 import ResponsePanel from './components/ResponsePanel';
 import MetricsPanel from './components/MetricsPanel';
 import HistoryPanel from './components/HistoryPanel';
 import InsightsPanel from './components/InsightsPanel';
 import { AuthGuard } from './components/AuthGuard';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './contexts/useAuth';
 import { LoginPage } from './pages/LoginPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { supabase } from './lib/supabase';
+import { api } from './lib/api';
 import type { RouteResponse, HistoryEntry, OptimizationMode } from './types';
 
 type Theme = 'light' | 'dark';
-type Tab = 'prompt' | 'history' | 'metrics' | 'insights';
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
+interface HistoryRow { id: string; prompt: string; result: RouteResponse; created_at: string; }
 
-function IconRoute()    { return <svg className="nav-icon" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>; }
-function IconHistory()  { return <svg className="nav-icon" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>; }
-function IconMetrics()  { return <svg className="nav-icon" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>; }
-function IconInsights() { return <svg className="nav-icon" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>; }
-function IconSun()      { return <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>; }
-function IconMoon()     { return <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>; }
-function IconSettings() { return <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>; }
-
-const TAB_META: Record<Tab, { label: string; icon: ReactNode }> = {
-  prompt:   { label: 'Prompt',   icon: <IconRoute /> },
-  history:  { label: 'History',  icon: <IconHistory /> },
-  metrics:  { label: 'Metrics',  icon: <IconMetrics /> },
-  insights: { label: 'Insights', icon: <IconInsights /> },
-};
-
-const TABS: Tab[] = ['prompt', 'history', 'metrics', 'insights'];
-
-// ── Welcome screen ────────────────────────────────────────────────────────────
-
-function ChatWelcome() {
-  return (
-    <div className="chat-welcome">
-      <div style={{
-        width: 48, height: 48, borderRadius: 14,
-        background: 'var(--surface-3)',
-        border: '1px solid var(--border-hi)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <svg width="22" height="22" fill="none" stroke="var(--text)" strokeWidth="2.5" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-        </svg>
-      </div>
-      <div>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--text)' }}>
-          ModelRouter AI
-        </h2>
-        <p style={{ margin: '6px 0 0', fontSize: 13.5, color: 'var(--text-2)', lineHeight: 1.5 }}>
-          Routes your prompt to the optimal model based on task type, cost, and quality.
-        </p>
-      </div>
-      <div style={{
-        display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginTop: 4,
-      }}>
-        {['Code', 'Math', 'Creative', 'Research', 'General'].map(tag => (
-          <span key={tag} style={{
-            fontSize: 12, padding: '4px 12px',
-            background: 'var(--surface-2)', border: '1px solid var(--border)',
-            borderRadius: 99, color: 'var(--text-2)',
-          }}>{tag}</span>
-        ))}
-      </div>
-    </div>
-  );
+function toEntry(row: HistoryRow): HistoryEntry {
+  return { id: row.id, prompt: row.prompt, result: row.result, timestamp: new Date(row.created_at) };
 }
 
-// ── Main app (protected) ──────────────────────────────────────────────────────
-
-function MainApp() {
-  const { isNewUser } = useAuth();
-  const navigate = useNavigate();
-
-  const [tab,     setTab]     = useState<Tab>('prompt');
-  const [result,  setResult]  = useState<RouteResponse | null>(null);
-  const [error,   setError]   = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [theme,   setTheme]   = useState<Theme>(() => {
-    return (localStorage.getItem('mr-theme') as Theme | null) ?? 'dark';
-  });
-
+function useTheme(): [Theme, () => void] {
+  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('mr-theme') as Theme | null) ?? 'light');
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('mr-theme', theme);
   }, [theme]);
+  return [theme, () => setTheme(t => (t === 'dark' ? 'light' : 'dark'))];
+}
 
-  // Redirect new users to onboarding
-  useEffect(() => {
-    if (isNewUser) navigate('/onboarding', { replace: true });
-  }, [isNewUser, navigate]);
+// Shell ----------------------------------------------------------------------
 
-  // Load history from backend on mount
-  useEffect(() => {
-    async function loadHistory() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) return;
-      try {
-        const res = await fetch('/api/history', {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        if (!res.ok) return;
-        const body = await res.json() as { history: Array<{ id: string; prompt: string; result: RouteResponse; created_at: string }> };
-        setHistory(body.history.map(e => ({
-          id:        e.id,
-          prompt:    e.prompt,
-          result:    e.result,
-          timestamp: new Date(e.created_at),
-        })));
-      } catch { /* non-fatal */ }
-    }
-    loadHistory();
-  }, []);
+function TopBar({ historyCount }: { historyCount: number }) {
+  const [theme, toggleTheme] = useTheme();
+  return (
+    <header className="topbar">
+      <div className="topbar-inner">
+        <Link to="/" className="wordmark">ModelRouter</Link>
+        <nav className="topnav" aria-label="Main">
+          <NavLink to="/" end>Prompt</NavLink>
+          <NavLink to="/history">History{historyCount > 0 ? ` (${historyCount})` : ''}</NavLink>
+          <NavLink to="/performance">Performance</NavLink>
+          <NavLink to="/metrics">Metrics</NavLink>
+        </nav>
+        <div className="topbar-right">
+          <Link to="/settings" className="icon-btn" aria-label="Settings" title="Settings">
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path strokeLinecap="round" d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+            </svg>
+          </Link>
+          <button className="icon-btn" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Use light theme' : 'Use dark theme'} title="Toggle theme">
+            {theme === 'dark' ? (
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" />
+                <path strokeLinecap="round" d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4l1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
 
-  async function handleSubmit(
-    prompt: string,
-    options: { maxTokens?: number; optimizationMode: OptimizationMode }
-  ) {
+// Prompt page ----------------------------------------------------------------
+
+interface PromptPageProps {
+  onRouted: (entry: HistoryEntry) => void;
+}
+
+function PromptPage({ onRouted }: PromptPageProps) {
+  const [result,  setResult]  = useState<RouteResponse | null>(null);
+  const [error,   setError]   = useState<string | null>(null);
+  const [noKeys,  setNoKeys]  = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(prompt: string, options: { maxTokens?: number; optimizationMode: OptimizationMode }) {
     setLoading(true);
     setError(null);
+    setNoKeys(false);
     try {
-      // Include auth token when available
-      const { data: { session } } = await supabase.auth.getSession();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+      const res  = await api('/route', { method: 'POST', body: JSON.stringify({ prompt, ...options }) });
+      const body = await res.json();
+
+      if (!res.ok) {
+        if (body.error === 'NO_KEYS') setNoKeys(true);
+        else setError(body.message ?? body.error ?? `Request failed (${res.status}).`);
+        setResult(null);
+        return;
       }
 
-      const res = await fetch('/api/route', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ prompt, ...options }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        const body = data as { error?: string; message?: string };
-        if (body.error === 'NO_KEYS') {
-          setError('NO_KEYS');
-        } else {
-          setError(body.message ?? body.error ?? 'Request failed.');
+      const routed = body as RouteResponse;
+      setResult(routed);
+
+      // Save to history; a failure here is not worth interrupting the user for.
+      try {
+        const saved = await api('/history', { method: 'POST', body: JSON.stringify({ prompt, result: routed }) });
+        if (saved.ok) {
+          const { entry } = await saved.json() as { entry: HistoryRow };
+          onRouted(toEntry(entry));
         }
-        setResult(null);
-      } else {
-        const routeResult = data as RouteResponse;
-        setResult(routeResult);
-        // Save to backend and prepend to local state
-        if (session?.access_token) {
-          fetch('/api/history', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-            body:    JSON.stringify({ prompt, result: routeResult }),
-          }).then(async r => {
-            if (!r.ok) return;
-            const body = await r.json() as { entry: { id: string; prompt: string; result: RouteResponse; created_at: string } };
-            const entry: HistoryEntry = {
-              id:        body.entry.id,
-              prompt:    body.entry.prompt,
-              result:    body.entry.result,
-              timestamp: new Date(body.entry.created_at),
-            };
-            setHistory(prev => [entry, ...prev].slice(0, 20));
-          }).catch(() => { /* non-fatal */ });
-        }
-      }
+      } catch { /* ignore */ }
     } catch {
       setError('Could not reach the backend. Is it running?');
       setResult(null);
@@ -178,202 +116,81 @@ function MainApp() {
     }
   }
 
-  const isDark = theme === 'dark';
-
   return (
-    <div className="app-shell">
+    <div className="page stack">
+      <PromptCard onSubmit={handleSubmit} loading={loading} />
 
-      {/* ── Header ── */}
-      <header className="app-header">
-        <div className="header-inner">
+      {result?.freeTier && (
+        <p className="note">
+          You have no API keys saved, so this ran on Groq's free tier with a single fixed model.
+          <Link to="/settings"> Add a key</Link> to get routing across OpenAI, Anthropic and Together AI.
+        </p>
+      )}
 
-          {/* Brand */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div style={{
-              width: 26, height: 26, borderRadius: 7,
-              background: 'var(--surface-3)',
-              border: '1px solid var(--border-hi)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}>
-              <svg width="13" height="13" fill="none" stroke="var(--text)" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-              </svg>
-            </div>
-            <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.025em', color: 'var(--text)' }}>
-              ModelRouter
-            </span>
-          </div>
+      {noKeys && (
+        <p className="note">
+          No API keys are saved for your account and the server has no free-tier key configured.
+          <Link to="/settings"> Add a key in Settings</Link> to start routing.
+        </p>
+      )}
 
-          {/* Mobile tabs */}
-          <nav className="mobile-tabs" style={{ height: '100%' }} aria-label="Navigation">
-            {TABS.map(t => (
-              <button key={t} className={`tab-btn${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-                {TAB_META[t].label}
-              </button>
-            ))}
-          </nav>
-
-          {/* Right controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Settings link */}
-            <Link
-              to="/settings"
-              aria-label="Settings"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 30, height: 30, borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border)',
-                background: 'transparent',
-                color: 'var(--text-2)',
-                textDecoration: 'none',
-              }}
-            >
-              <IconSettings />
-            </Link>
-
-            {/* Theme toggle */}
-            <button
-              onClick={() => setTheme(isDark ? 'light' : 'dark')}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="btn-icon"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 30, height: 30, borderRadius: 'var(--radius-sm)',
-                border: '1px solid var(--border)',
-                background: 'transparent',
-              }}
-            >
-              {isDark ? <IconSun /> : <IconMoon />}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Body ── */}
-      <div className="app-body">
-
-        {/* Sidebar */}
-        <aside className="app-sidebar" aria-label="Navigation">
-          <div className="nav-section">
-            {TABS.map(t => (
-              <button
-                key={t}
-                className={`nav-btn${tab === t ? ' active' : ''}`}
-                onClick={() => setTab(t)}
-                aria-current={tab === t ? 'page' : undefined}
-              >
-                {TAB_META[t].icon}
-                {TAB_META[t].label}
-                {t === 'history' && history.length > 0 && (
-                  <span className="nav-badge">{history.length}</span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Sidebar footer */}
-          <div style={{ marginTop: 'auto', padding: '16px 12px', borderTop: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.7, padding: '0 2px' }}>
-              <div style={{ fontWeight: 500, color: 'var(--text-2)', marginBottom: 2 }}>Providers</div>
-              Together AI · OpenAI · Anthropic
-            </div>
-          </div>
-        </aside>
-
-        {/* Main */}
-        <main className={`app-main${tab === 'prompt' ? ' is-chat' : ''}`} id="main-content">
-
-          {tab === 'prompt' && (
-            <div className="chat-layout">
-              <div className="chat-messages">
-                {!result && !loading && !error
-                  ? <ChatWelcome />
-                  : error === 'NO_KEYS'
-                  ? (
-                    <div className="anim-fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                      <div style={{ maxWidth: 400, textAlign: 'center', padding: '0 24px' }}>
-                        <p style={{ fontSize: 15, color: 'var(--text)', fontWeight: 600, margin: '0 0 8px' }}>No API keys added</p>
-                        <p style={{ fontSize: 13.5, color: 'var(--text-2)', margin: '0 0 20px', lineHeight: 1.6 }}>
-                          You need to add at least one API key before routing prompts.
-                        </p>
-                        <Link to="/settings" style={{ color: 'var(--accent)', fontSize: 13.5, fontWeight: 500 }}>
-                          Go to Settings →
-                        </Link>
-                      </div>
-                    </div>
-                  )
-                  : (
-                    <div className="anim-fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                      {result?.freeTier && (
-                        <div style={{
-                          display:        'flex',
-                          alignItems:     'center',
-                          justifyContent: 'space-between',
-                          gap:            12,
-                          padding:        '9px 16px',
-                          background:     'var(--surface-2)',
-                          borderBottom:   '1px solid var(--border)',
-                          fontSize:       13,
-                          color:          'var(--text-2)',
-                          flexShrink:     0,
-                        }}>
-                          <span>
-                            You're on the <strong style={{ color: 'var(--text)' }}>free tier</strong> — responses are powered by Groq's open-source models. Add your own API keys for full routing across OpenAI, Anthropic, and Together AI.
-                          </span>
-                          <Link to="/settings" style={{ color: 'var(--accent)', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                            Add keys →
-                          </Link>
-                        </div>
-                      )}
-                      <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <ResponsePanel result={result} error={error} loading={loading} />
-                      </div>
-                    </div>
-                  )
-                }
-              </div>
-              <div className="chat-input-footer">
-                <PromptCard onSubmit={handleSubmit} loading={loading} />
-              </div>
-            </div>
-          )}
-
-          {tab === 'history' && (
-            <div className="page-content" style={{ maxWidth: 800 }}>
-              <HistoryPanel history={history} />
-            </div>
-          )}
-
-          {tab === 'metrics' && (
-            <div className="page-content">
-              <MetricsPanel />
-            </div>
-          )}
-
-          {tab === 'insights' && (
-            <div style={{ padding: '32px 36px', width: '100%' }}>
-              <InsightsPanel />
-            </div>
-          )}
-
-        </main>
-      </div>
+      <ResponsePanel result={result} error={error} loading={loading} />
     </div>
   );
 }
 
-// ── Root with router ──────────────────────────────────────────────────────────
+// Main app -------------------------------------------------------------------
+
+function MainApp() {
+  const { isNewUser } = useAuth();
+  const navigate = useNavigate();
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  useEffect(() => {
+    if (isNewUser) navigate('/onboarding', { replace: true });
+  }, [isNewUser, navigate]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api('/history');
+        if (!res.ok) return;
+        const body = await res.json() as { history: HistoryRow[] };
+        if (!cancelled) setHistory(body.history.map(toEntry));
+      } catch { /* history is optional */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const addEntry = useCallback((entry: HistoryEntry) => {
+    setHistory(prev => [entry, ...prev].slice(0, 20));
+  }, []);
+
+  return (
+    <>
+      <TopBar historyCount={history.length} />
+      <main>
+        <Routes>
+          <Route path="/"            element={<PromptPage onRouted={addEntry} />} />
+          <Route path="/history"     element={<div className="page"><HistoryPanel history={history} /></div>} />
+          <Route path="/performance" element={<div className="page"><InsightsPanel /></div>} />
+          <Route path="/metrics"     element={<div className="page"><MetricsPanel /></div>} />
+        </Routes>
+      </main>
+    </>
+  );
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/login"       element={<LoginPage />} />
-          <Route path="/onboarding"  element={<AuthGuard><OnboardingPage /></AuthGuard>} />
-          <Route path="/settings"    element={<AuthGuard><SettingsPage /></AuthGuard>} />
-          <Route path="/*"           element={<AuthGuard><MainApp /></AuthGuard>} />
+          <Route path="/login"      element={<LoginPage />} />
+          <Route path="/onboarding" element={<AuthGuard><OnboardingPage /></AuthGuard>} />
+          <Route path="/settings"   element={<AuthGuard><SettingsPage /></AuthGuard>} />
+          <Route path="/*"          element={<AuthGuard><MainApp /></AuthGuard>} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

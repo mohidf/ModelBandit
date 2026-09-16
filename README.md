@@ -1,310 +1,296 @@
-# ModelRouter AI
+# ModelRouter
 
-A self-optimizing LLM router that classifies every prompt, picks the cheapest capable model, and learns from every call across 11 task domains.
+A service that reads an LLM prompt, works out what kind of task it is, and sends
+it to the cheapest model that should be able to handle it. It keeps score of how
+every model does on every kind of task and uses that to make the next decision.
 
----
+I built it because I kept paying GPT-4o prices for prompts like "what's the
+capital of Peru". Most prompts don't need the best model, but you can't tell
+which ones do without looking at them first - so this looks at them first.
 
-## Features
+## Try it in your browser
 
-- **Hybrid classifier** — two-stage pipeline: fast regex signals (~0 ms) for clear prompts; nearest-neighbour embedding search (`text-embedding-3-small`) for ambiguous ones. Anchor vectors pre-loaded at startup so only the live prompt pays API latency (~150 ms).
-- **11 task domains** — coding, coding_debug, math, math_reasoning, creative, general, general_chat, research, summarization, vision, multilingual
-- **Classifier precision** — explain-intent detection routes pure "explain X" prompts to general rather than domain specialists; vision domain avoids false positives on chart/graph coding prompts
-- **Together AI as primary provider** — serverless Turbo models (Qwen 2.5 7B/72B, Llama 3.3 70B, DeepSeek-V3, Llama 4 Maverick) routed by tier
-- **Multi-provider fallback** — OpenAI and Anthropic as fallbacks; vision uses Llama 4 Maverick / GPT-4o; research escalates to Claude
-- **Epsilon-greedy bandit** — 90% exploitation of Supabase performance data, 10% random exploration to discover better options
-- **Domain-specific strategy weights** — each domain has tuned cost/latency/escalation weights so cheap models are not unfairly penalised
-- **Margin-based confidence** — confidence = (top − second) / top, calibrated to 4–12% healthy escalation rate
-- **Adaptive EMA learning** — exponential moving averages update per-model stats after every call
-- **Rate limiting** — per-IP fixed-window limiter with periodic memory pruning; standard `X-RateLimit-*` headers; separate budget for meta endpoints
+**[mohidf.github.io/ModelRouter](https://mohidf.github.io/ModelRouter/)**
 
----
+Type a prompt and it shows what the router would do with it: which task type
+the regexes voted for and why, how confident that vote was, and which model
+wins the scoring and by how much. It's the server's actual classifier and
+scoring code from [`backend/src`](backend/src) bundled with Vite, running
+against a snapshot of my performance table. No server, no keys.
 
-## Architecture
+Two things it can't do: ambiguous prompts on the real server go on to an
+embedding step that needs an OpenAI key, and it doesn't call a model, so
+you get the decision but not the answer. The full app below does both.
 
-```
-User Prompt
-     ↓
-HybridClassifier
-  ├─ Stage 1: RuleBasedClassifier   (regex signals, ~0 ms, free)
-  │       confidence ≥ 0.80 → fast path — skip embedding entirely
-  └─ Stage 2: EmbeddingClassifier   (nearest-neighbour cosine similarity)
-          maxSimilarity over ~120 anchor vectors across 11 domains
-     ↓
-StrategyEngine          (epsilon-greedy bandit, domain-specific weights)
-  score = confWeight × avgConf − costWeight × normCost
-        − latWeight  × normLat − escalWeight × escalRate
-     ↓
-ProviderManager         (resolves provider + tier → model ID)
-     ↓
-LLM Provider            (Together AI / OpenAI / Anthropic)
-     ↓
-PerformanceStore        (EMA update → Supabase)
-```
+Each request goes through four steps:
 
----
+1. **Classify** - what kind of task is this, how hard is it, and how sure are we
+2. **Choose** - score every model that has history on this task type, pick the best
+3. **Run** - call the provider, and if the classifier wasn't confident, retry one tier up
+4. **Learn** - fold the result into that model's running averages for next time
 
-## Tech Stack
+The backend is Node and TypeScript on Express, with Postgres (Supabase) for the
+performance history and user accounts. The frontend is React. There are three
+real providers wired up - Together AI, OpenAI and Anthropic - plus Groq for a
+free tier when a user hasn't added any keys of their own.
 
-| Layer     | Technology                                       |
-|-----------|--------------------------------------------------|
-| Frontend  | React 19, Vite, TypeScript, Tailwind CSS v4      |
-| Backend   | Node.js, TypeScript, Express                     |
-| AI        | Together AI, OpenAI API, Anthropic API           |
-| Embeddings| OpenAI `text-embedding-3-small`                  |
-| Database  | Supabase (PostgreSQL + EMA performance store)    |
+## Running it
 
----
-
-## Project Structure
-
-```
-model-router-ai/
-├── backend/
-│   ├── src/
-│   │   ├── config.ts                Centralised config (env vars, defaults)
-│   │   ├── index.ts                 Express app, rate limiters, startup warm-up
-│   │   ├── config/
-│   │   │   └── models.ts            MODEL_REGISTRY — canonical model IDs + tiers
-│   │   ├── providers/
-│   │   │   ├── togetherProvider.ts  Together AI (OpenAI-compatible endpoint)
-│   │   │   ├── openaiProvider.ts    OpenAI provider
-│   │   │   ├── claudeProvider.ts    Anthropic provider
-│   │   │   ├── providerManager.ts   Multi-tier dispatch + model-ID resolution
-│   │   │   ├── index.ts             ROUTING_TABLE — domain → provider mapping
-│   │   │   └── types.ts             TaskDomain, ModelTier, shared types
-│   │   ├── services/
-│   │   │   ├── classifier.ts        Rule-based classifier (regex signals, explain-intent detection)
-│   │   │   ├── hybridClassifier.ts  Two-stage hybrid (rule-based → embedding fallback)
-│   │   │   ├── embeddingClassifier.ts  Nearest-neighbour embedding classifier
-│   │   │   ├── anchors.ts           ~120 anchor phrases across 11 domains
-│   │   │   ├── strategyEngine.ts    Epsilon-greedy bandit with domain weights + DB fallback
-│   │   │   ├── performanceStore.ts  EMA stats store (Supabase-backed)
-│   │   │   ├── metrics.ts           In-memory request metrics aggregator
-│   │   │   └── router.ts            Main routing pipeline
-│   │   ├── middleware/
-│   │   │   ├── rateLimiter.ts       Per-IP fixed-window limiter with prune()
-│   │   │   ├── errorHandler.ts      Global Express error handler
-│   │   │   └── requestLogger.ts     HTTP request/response logger
-│   │   ├── routes/
-│   │   │   ├── route.ts             POST /route — classify + route + respond
-│   │   │   ├── metrics.ts           GET /metrics — aggregate stats
-│   │   │   └── performance.ts       GET /performance — per-domain insights (parallelised)
-│   │   ├── __tests__/
-│   │   │   ├── classifier.test.ts   Domain classification + explain-intent tests
-│   │   │   ├── strategyEngine.test.ts  Bandit scoring + DB resilience tests
-│   │   │   └── rateLimiter.test.ts  Window expiry + prune tests (fake timers)
-│   │   ├── scripts/
-│   │   │   ├── benchmark.ts         50-prompt accuracy + cost benchmark
-│   │   │   └── resetStats.ts        Clear Supabase perf data for fresh start
-│   │   └── lib/
-│   │       └── supabase.ts          Supabase client singleton
-│   └── supabase/migrations/         SQL schema files (001–004)
-├── frontend/
-│   └── src/
-│       ├── App.tsx                  Shell, tabs, theme toggle, history state
-│       ├── index.css                Design tokens, layout, animations
-│       ├── components/
-│       │   ├── PromptCard.tsx       Prompt input with mode pills (cost/balanced/quality)
-│       │   ├── ResponsePanel.tsx    Two-column: prose left, pipeline + options right
-│       │   ├── HistoryPanel.tsx     Session history with result previews
-│       │   ├── MetricsPanel.tsx     Live request stats + per-model breakdown
-│       │   └── InsightsPanel.tsx    Per-domain best-model adaptive scores
-│       ├── utils/
-│       │   └── modelDisplay.ts      Model ID → short display name mapping
-│       └── types.ts                 Mirrors backend RouteResponse + related types
-└── docs/
-    └── routing-strategy.md
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- [OpenAI API key](https://platform.openai.com/api-keys) — for embeddings (`text-embedding-3-small`) and GPT-4o fallback
-- [Anthropic API key](https://console.anthropic.com/settings/keys) — for Claude fallback on research/complex tasks
-- [Together AI API key](https://api.together.xyz) — primary provider (cheap serverless models)
-- [Supabase](https://supabase.com) project — performance persistence
-
-### 1. Clone
+You need Node 18+, a Supabase project, and at least one provider key.
 
 ```bash
 git clone https://github.com/mohidf/ModelRouter.git
 cd ModelRouter
+npm run install:all
+
+cp backend/.env.example backend/.env       # fill in Supabase + provider keys
+cp frontend/.env.example frontend/.env.local   # Supabase URL + anon key
 ```
 
-### 2. Install dependencies
+Run the SQL files in `backend/supabase/migrations/` against your project in
+order, then:
 
 ```bash
-cd backend && npm install
-cd ../frontend && npm install
+npm run backend:dev    # http://localhost:3000
+npm run frontend:dev   # http://localhost:5173, proxies /api to the backend
 ```
 
-### 3. Configure environment
+Sign up in the browser, paste a provider key on the settings page, and send a
+prompt. Without a key, prompts go to a single free Groq model so you can still
+try it, but you won't see any routing.
 
-```bash
-cp backend/.env.example backend/.env
-# Fill in: OPENAI_API_KEY, ANTHROPIC_API_KEY, TOGETHER_API_KEY,
-#          SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-```
+The keys that matter:
 
-Key optional variables:
+| variable | what it's for |
+|---|---|
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | required - performance history, accounts, saved keys |
+| `TOGETHER_API_KEY` | the default provider for most task types |
+| `OPENAI_API_KEY` | GPT-4o as a fallback, and the embedding step of the classifier |
+| `ANTHROPIC_API_KEY` | Claude, used for research and as an escalation target |
+| `GROQ_API_KEY` | free tier for users with no keys of their own |
+| `CONFIDENCE_THRESHOLD` | below this classifier confidence, escalate (default `0.20`) |
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CONFIDENCE_THRESHOLD` | `0.20` | Margin below which escalation fires |
-| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for classifier |
+Users can also save their own provider keys from the settings page. When they
+do, their key is used instead of the server's for that provider.
 
-### 4. Apply database migrations
+## How it decides
 
-Run the SQL files in `backend/supabase/migrations/` against your Supabase project in order (001 → 004).
+### Classifying the prompt
 
-### 5. Start
+There are eleven task types: code, debugging, math, math reasoning, creative
+writing, research, summarization, vision, chat, multilingual, and general.
 
-```bash
-# Terminal 1
-cd backend && npm run dev      # → http://localhost:3000
+Classification is two stages. The first is a pile of weighted regexes - code
+fences, language names, "traceback", "summarize", "write a poem", that kind of
+thing. Each match adds points to a task type. If at least 80% of the points land
+on one type, that's the answer and we're done in well under a millisecond.
 
-# Terminal 2
-cd frontend && npm run dev     # → http://localhost:5173
-```
+If it's less clear than that, the prompt gets embedded with
+`text-embedding-3-small` and compared against about 120 example prompts (10 to
+12 per task type) that were embedded once at startup. The type whose *closest*
+example is nearest wins. I originally averaged similarity across each type's
+examples, but that punished types whose examples are diverse - a prompt that
+exactly matches one example would lose to a type with twelve vaguely similar
+ones. Taking the max fixed it.
 
----
+Confidence is `(best - second best) / best`. So it's not "how well did the
+winner match", it's "how much better was it than the runner-up". A prompt that
+matches code at 0.9 and debugging at 0.85 is genuinely ambiguous and gets a low
+number, even though 0.9 sounds high.
 
-## Available Scripts
+Complexity (low, medium, high) comes from the rule-based stage regardless -
+it's mostly word count and structural signals, and an embedding doesn't know
+anything about that.
 
-### Backend (`/backend`)
+If the embedding call fails for any reason, the rule-based answer is used and
+the request goes through anyway. Classification infrastructure is never allowed
+to block a request.
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | nodemon + ts-node hot reload |
-| `npm run build` | Compile TypeScript to `dist/` |
-| `npm start` | Run compiled `dist/index.js` |
-| `npm test` | Jest unit test suite |
-| `npm run test:coverage` | Tests with coverage report |
-| `npm run benchmark` | 50-prompt accuracy + cost benchmark |
-| `npm run reset:stats` | Clear Supabase performance data |
+### Choosing a model
 
-### Frontend (`/frontend`)
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Vite dev server with HMR |
-| `npm run build` | Type-check + build to `dist/` |
-| `npm run preview` | Preview production build |
-
----
-
-## How It Works
-
-### 1. Classify
-
-The hybrid classifier assigns each prompt a `domain` (11 options) and `complexity` (low/medium/high).
-
-**Fast path** — regex signals score the prompt in ~0 ms. If one domain's score dominates with confidence ≥ 0.80, the result is used immediately and the embedding is never called.
-
-**Slow path** — for ambiguous prompts, `text-embedding-3-small` embeds the prompt and compares it against ~120 pre-computed anchor vectors (10–12 per domain) using **max cosine similarity** (nearest-neighbour). Max is used instead of mean so that a single exact-match anchor wins cleanly without being diluted by diverse anchors in the same domain.
-
-**Confidence** is computed as `(top_score − second_score) / top_score`. Values above `CONFIDENCE_THRESHOLD` (default 0.20) are accepted directly; values below trigger escalation.
-
-### 2. Route
-
-The **StrategyEngine** scores every (provider, tier) combination using per-domain weights:
+Every model has a row per task type in Postgres holding running averages of its
+confidence, latency, cost, and how often it needed escalating. For the task type
+at hand, each model gets scored:
 
 ```
-score = confidenceWeight × avgConfidence
-      − costWeight       × normalisedCost
-      − latencyWeight    × normalisedLatency
-      − escalationWeight × escalationRate
+score = w_conf · confidence
+      − w_cost · (cost / $0.20)
+      − w_lat  · (latency / 30 s)
+      − w_esc  · escalation rate
 ```
 
-With probability ε = 10% it randomly selects a different model to explore. Domain-specific `escalationWeight` values are kept low (0.2–0.8) so cheap models are not unfairly penalised when escalation was triggered by classifier uncertainty rather than model failure.
+Cost and latency are divided by a ceiling so everything is in the range 0 to 1
+before the weights touch it. Before I did that the weights meant nothing - a
+latency of 2000 (ms) swamped a cost of 0.0003 (dollars) no matter what you
+multiplied them by.
 
-### 3. Learn
+The weights differ per task type. Summarization and chat weight cost heavily
+because nearly any model can do them; debugging and math reasoning weight
+confidence heavily because a wrong answer costs the user more than the tokens
+did. The user can also shift them per request - "cheapest that works" or
+"best answer" in the UI - which overrides a few of the weights.
 
-After every call, EMA-smoothed stats (confidence, cost, latency, escalation rate) are written to Supabase. Each subsequent request benefits from the updated data.
+Highest score wins. Ties are broken by cost and then latency, so the database's
+row order never decides anything.
 
----
+10% of the time the router ignores all of this and picks a model at random from
+the tiers that make sense for the complexity. Without that it would find one
+good model per task type and never learn whether a cheaper one could do the job.
 
-## API Endpoints
+If there's no history for a task type yet, it falls back to a static table:
+the task type picks the provider and the complexity picks the tier.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/route` | Classify prompt and return LLM response |
-| `GET` | `/metrics` | Aggregate request statistics |
-| `GET` | `/performance` | Per-domain best-model insights |
+### Escalating
 
-### POST `/route`
+If classifier confidence came in below the threshold, the request runs again on
+the next tier up within the same provider, or on the fallback provider's premium
+tier if it was already at the top. Both calls are recorded and both are counted
+in the cost shown to the user.
+
+The important detail is what gets recorded. The first call is marked as having
+escalated, which raises that model's escalation rate. Early on I weighted
+escalation rate heavily in the score, and the router quickly stopped using cheap
+models for chat and creative prompts. But those escalations weren't the cheap
+model's fault - they happened because the *classifier* wasn't sure, before the
+model was ever called. The escalation weight for those task types is now 0.2,
+low enough that it doesn't matter much.
+
+### Learning
+
+After every call the model's row is updated with an exponential moving average
+(alpha 0.2) of each metric. That's done in a Postgres function so two concurrent
+requests for the same model can't race each other. Alpha 0.2 means the last
+five or so calls dominate, which is enough to react when a provider has a slow
+day and stable enough not to flip-flop on one outlier.
+
+## The interface
+
+The prompt page shows the answer, and above it, a plain-English line saying
+what the router did: what it classified the prompt as, how confident it was,
+which model it sent it to and why. Below is a table of every model it
+considered with their averages and scores, so you can see why the winner won.
+
+![prompt page](assets/screenshots/ui1.png)
+
+**Performance** shows what the router currently believes about every model for
+every task type - the same tables it uses to decide. **Metrics** is request
+totals since the backend last started. **History** is your last 20 requests.
+
+![performance page](assets/screenshots/ui4.png)
+
+## API
+
+`POST /route` with a Bearer token from Supabase auth:
 
 ```json
-{
-  "prompt": "Explain binary search trees",
-  "maxTokens": 1024,
-  "optimizationMode": "balanced"
-}
+{ "prompt": "Explain binary search trees", "maxTokens": 1024, "optimizationMode": "balanced" }
 ```
 
-`optimizationMode`: `"cost"` | `"balanced"` | `"quality"`
-
-### Response shape
+`optimizationMode` is `cost`, `balanced`, or `quality`. The response carries the
+answer plus everything that went into the decision:
 
 ```json
 {
   "response": "...",
-  "classification": {
-    "domain": "coding",
-    "complexity": "low",
-    "confidence": 0.94,
-    "estimatedTokens": 12
-  },
-  "initialModel": {
-    "provider": "together",
-    "model": "Qwen/Qwen2.5-7B-Instruct-Turbo",
-    "tier": "cheap",
-    "reason": "...",
-    "modelConfidence": 1.0
-  },
-  "finalModel": { "provider": "together", "model": "Qwen/Qwen2.5-7B-Instruct-Turbo", "tier": "cheap", "reason": "...", "modelConfidence": 1.0 },
+  "classification": { "domain": "coding", "complexity": "low", "confidence": 0.94, "estimatedTokens": 12 },
+  "initialModel":   { "provider": "together", "model": "Qwen/Qwen2.5-7B-Instruct-Turbo", "tier": "cheap", "reason": "..." },
+  "finalModel":     { "provider": "together", "model": "Qwen/Qwen2.5-7B-Instruct-Turbo", "tier": "cheap", "reason": "..." },
   "escalated": false,
   "strategyMode": "exploitation",
   "latencyMs": 1842,
   "totalCostUsd": 0.0000731,
-  "evaluatedOptions": [
-    {
-      "modelId": "Qwen/Qwen2.5-7B-Instruct-Turbo",
-      "provider": "together",
-      "tier": "cheap",
-      "score": 2.91,
-      "averageConfidence": 1.0,
-      "averageLatencyMs": 1842,
-      "averageCostUsd": 0.0000731,
-      "escalationRate": 0.0,
-      "totalRequests": 14
-    }
-  ]
+  "evaluatedOptions": [ { "modelId": "...", "score": 2.91, "averageConfidence": 1.0, "averageLatencyMs": 1842, "averageCostUsd": 0.0000731, "escalationRate": 0.0, "totalRequests": 14 } ]
 }
 ```
 
----
+`GET /performance` returns the per-task-type rankings, `GET /metrics` the
+in-memory totals, and `/history` and `/keys` (GET, POST, DELETE) manage the
+signed-in user's data. `/route` is rate limited to 50 requests an hour per IP,
+the rest to 200.
 
-## Screenshots
+## Tests
 
-### Prompt — response with routing pipeline and evaluated options
-![Prompt tab](assets/screenshots/ui1.png)
+```bash
+cd backend && npm test
+```
 
-### History — session history with classification and routing details
-![History panel](assets/screenshots/ui2.png)
+158 tests. The classifier ones are mostly prompts I got wrong at some point
+pinned so they stay right: "create a bar chart with D3" is code, not vision;
+"explain how hash maps work" is general, not code; "in the history of
+computing" is not research.
 
-### Metrics — live request statistics and per-model breakdown
-![Metrics tab](assets/screenshots/ui3.png)
+`npm run export:snapshot` copies the live performance table into the browser
+demo so it ranks models with current numbers.
 
-### Insights — best provider per task type with adaptive scores
-![Insights tab](assets/screenshots/ui4.png)
+There's also `npm run benchmark`, which sends 50 labelled prompts through a
+running backend and reports classification accuracy split by whether the prompt
+has obvious keywords or not, what it cost against sending everything to GPT-4o,
+and latency percentiles. It needs real keys and takes a few minutes.
 
----
+## How the code is laid out
 
-## License
+```
+backend/src/
+  index.ts                     Express app, rate limiters, startup warm-up
+  config.ts                    every env var, parsed and validated once
+  config/models.ts             the model registry: IDs, tiers, prices, context windows
+  config/routing.ts            the static fallback table: task type → provider, complexity → tier
+  services/
+    classifier.ts              stage 1: weighted regexes
+    embeddingClassifier.ts     stage 2: nearest anchor by cosine similarity
+    anchors.ts                 the ~120 example prompts
+    hybridClassifier.ts        runs stage 1, falls through to stage 2 when unsure
+    scoring.ts                 the score formula and per-task weights, pure
+    strategyEngine.ts          ranks models with it, adds env overrides and the 10% exploration
+    performanceStore.ts        read/write the running averages in Postgres
+    router.ts                  the whole pipeline: classify, choose, run, escalate, record
+    metrics.ts                 in-memory totals for GET /metrics
+  providers/
+    baseProvider.ts            the interface every provider implements
+    providerManager.ts         registry, static routing table, escalation logic
+    togetherProvider.ts        \
+    openaiProvider.ts           | one file per provider
+    claudeProvider.ts           |
+    groqProvider.ts            /  free tier only
+    index.ts                   wires providers to task types
+  middleware/                  auth (Supabase JWT), rate limiter, error handler, logger
+  routes/                      route, performance, metrics, history, keys
+  scripts/benchmark.ts         the 50-prompt benchmark
+  __tests__/                   Jest
+backend/supabase/migrations/   schema, in order
 
-[MIT](LICENSE)
+frontend/src/
+  App.tsx                      shell, routing, the prompt page
+  components/                  prompt form, response + decision panel, history, performance, metrics
+  pages/                       login, onboarding, settings (API keys)
+  utils/labels.ts              plain-English names for task types, tiers, providers
+
+demo/                          the browser demo, published to GitHub Pages by .github/workflows/pages.yml
+  src/main.ts                  imports the classifier, scoring and routing table straight from backend/src
+  src/snapshot.json            performance table snapshot (refresh with npm run export:snapshot)
+
+docs/                          longer notes on the routing strategy, learning, and provider abstraction
+```
+
+## Things I learned the hard way
+
+- Together AI's plain model IDs (`Qwen2.5-7B-Instruct`) return HTTP 400 on the
+  normal endpoint. You need the `-Turbo` variants; the others are for dedicated
+  endpoints only. This cost me an evening.
+- Mapping "high complexity" straight to the premium tier meant the first request
+  for every task type seeded the database with premium-only data, and from then
+  on the router exploited premium forever because nothing else had a score. High
+  complexity now starts at the middle tier and relies on escalation to go
+  higher, so cheaper models get a chance to earn a row.
+- When I removed a model from the registry, requests for task types that had
+  history for it started returning 500 - the strategy engine picked it as the
+  winner and then couldn't resolve it. It now skips stale rows and tries the
+  next best.
+- A per-IP rate limiter that never deletes entries is a slow memory leak. And
+  behind a proxy, without `trust proxy`, every request has the same IP and
+  everyone shares one bucket.
+- A regex for research that matched "history of" was routing "the history of
+  computing" to Claude Opus. Anything that broad needs to be much more
+  specific, or gone.
+- Metrics in different units can't share a weighted sum. Normalise first.
+- The classifier's confidence should measure the margin, not the match.

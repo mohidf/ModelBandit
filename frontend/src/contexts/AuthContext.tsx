@@ -1,99 +1,48 @@
-/**
- * AuthContext.tsx
- *
- * Provides authentication state and actions to the entire app.
- *
- * Exposes:
- *   user       — Supabase User object or null when not authenticated
- *   loading    — true while the initial session is being resolved
- *   isNewUser  — true if this is the user's first sign-in (for onboarding)
- *   signOut()  — signs out and clears session
- */
-
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { AuthContext } from './useAuth';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+const NEW_USER_KEY  = 'mr_is_new_user';
+const ONBOARDED_KEY = 'mr_onboarded';
 
-interface AuthContextValue {
-  user:         User | null;
-  loading:      boolean;
-  isNewUser:    boolean;
-  signOut:      () => Promise<void>;
-  clearNewUser: () => void;
-}
-
-// ---------------------------------------------------------------------------
-// Context
-// ---------------------------------------------------------------------------
-
-const AuthContext = createContext<AuthContextValue | null>(null);
-
-// ---------------------------------------------------------------------------
-// Provider
-// ---------------------------------------------------------------------------
-
+/**
+ * Holds the Supabase session for the whole app.
+ * `isNewUser` is true from the first sign-in until the onboarding page clears it.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user,      setUser]      = useState<User | null>(null);
-  const [loading,   setLoading]   = useState(true);
-  const [isNewUser, setIsNewUser] = useState(false);
+  const [user, setUser]           = useState<User | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [isNewUser, setIsNewUser] = useState(() => localStorage.getItem(NEW_USER_KEY) === 'true');
 
   useEffect(() => {
-    // Resolve the current session on mount.
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    // Subscribe to auth state changes (sign-in, sign-out, token refresh).
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
 
-        if (event === 'SIGNED_IN') {
-          // Mark as new user only on first sign-in (localStorage flag).
-          const alreadyOnboarded = localStorage.getItem('mr_onboarded') === 'true';
-          if (!alreadyOnboarded) {
-            localStorage.setItem('mr_is_new_user', 'true');
-            setIsNewUser(true);
-          }
-        }
+      if (event === 'SIGNED_IN' && localStorage.getItem(ONBOARDED_KEY) !== 'true') {
+        localStorage.setItem(NEW_USER_KEY, 'true');
+        setIsNewUser(true);
+      }
+      if (event === 'SIGNED_OUT') setIsNewUser(false);
+    });
 
-        if (event === 'SIGNED_OUT') {
-          setIsNewUser(false);
-        }
-      },
-    );
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  // Restore isNewUser flag from localStorage on mount.
-  useEffect(() => {
-    if (localStorage.getItem('mr_is_new_user') === 'true') {
-      setIsNewUser(true);
-    }
+    return () => subscription.unsubscribe();
   }, []);
 
   function clearNewUser(): void {
-    localStorage.removeItem('mr_is_new_user');
-    localStorage.setItem('mr_onboarded', 'true');
+    localStorage.removeItem(NEW_USER_KEY);
+    localStorage.setItem(ONBOARDED_KEY, 'true');
     setIsNewUser(false);
   }
 
   async function signOut(): Promise<void> {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw new Error(error.message);
   }
 
   return (
@@ -101,16 +50,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used inside <AuthProvider>');
-  }
-  return ctx;
 }
