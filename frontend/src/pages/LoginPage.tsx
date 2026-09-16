@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { signIn, signUp } from '../lib/auth';
 import { useAuth } from '../contexts/useAuth';
 
 type Mode = 'signin' | 'signup';
@@ -8,6 +8,7 @@ type Mode = 'signin' | 'signup';
 export function LoginPage() {
   const { user } = useAuth();
   const [mode, setMode]         = useState<Mode>('signin');
+  const [name, setName]         = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState<string | null>(null);
@@ -25,10 +26,12 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const { error: err } = mode === 'signup'
-        ? await supabase.auth.signUp({ email, password })
-        : await supabase.auth.signInWithPassword({ email, password });
-      if (err) setError(err.message);
+      const result = mode === 'signup'
+        ? await signUp.email({ name: name.trim() || email.split('@')[0], email, password })
+        : await signIn.email({ email, password });
+      if (result.error) setError(result.error.message ?? 'Something went wrong.');
+    } catch {
+      setError('Could not reach the server.');
     } finally {
       setLoading(false);
     }
@@ -43,6 +46,12 @@ export function LoginPage() {
         </p>
 
         <form onSubmit={handleSubmit}>
+          {mode === 'signup' && (
+            <div className="field">
+              <label htmlFor="name">Name</label>
+              <input id="name" type="text" value={name} onChange={e => setName(e.target.value)} autoComplete="name" />
+            </div>
+          )}
           <div className="field">
             <label htmlFor="email">Email</label>
             <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
@@ -55,7 +64,7 @@ export function LoginPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
-              minLength={mode === 'signup' ? 8 : undefined}
+              minLength={8}
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
             />
           </div>

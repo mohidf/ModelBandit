@@ -1,26 +1,20 @@
 /**
  * requestLog.ts
  *
- * Inserts one row into `request_logs` after every completed routing decision.
- * Always called fire-and-forget — never blocks the response.
+ * Inserts one row into request_logs after every completed routing decision.
+ * Always called fire-and-forget so it never delays the response.
  *
- * Privacy: raw prompt text is NEVER persisted. We store a SHA-256 hash of
- * the prompt plus its character length. The hash is a one-way fingerprint —
- * identical prompts are detectable for dedup/analytics, but the content
- * cannot be recovered from it. This eliminates persistent PII/secret exposure
- * from database access, backups, or log exports.
- *
- * If you need to correlate a specific prompt with a log entry, hash the
- * prompt client-side with SHA-256 and match against `prompt_hash`.
+ * The prompt text itself is never stored, only a SHA-256 hash and its length.
+ * Identical prompts are still detectable for analytics, but nothing in the
+ * table can be turned back into what a user typed.
  */
 
 import { createHash } from 'crypto';
 import type { TaskDomain, ModelTier } from '../providers/types';
-import { getSupabaseClient } from '../lib/supabase';
+import { getDb, schema } from '../db';
 
 export interface LogRequestParams {
   prompt:     string;
-  /** Canonical model ID (e.g. "meta-llama/Llama-3.3-70B-Instruct"). */
   modelId:    string;
   provider:   string;
   tier:       ModelTier;
@@ -36,22 +30,16 @@ function hashPrompt(prompt: string): string {
 }
 
 export async function logRequest(params: LogRequestParams): Promise<void> {
-  const { error } = await getSupabaseClient()
-    .from('request_logs')
-    .insert({
-      prompt_hash:   hashPrompt(params.prompt),
-      prompt_length: params.prompt.length,
-      model_id:      params.modelId,
-      provider:      params.provider,
-      tier:          params.tier,
-      task_type:     params.taskType,
-      latency_ms:    params.latencyMs,
-      confidence:    params.confidence,
-      cost_usd:      params.costUsd,
-      escalated:     params.escalated,
-    });
-
-  if (error) {
-    throw new Error(`requestLog.logRequest failed: ${error.message}`);
-  }
+  await getDb().insert(schema.requestLogs).values({
+    promptHash:   hashPrompt(params.prompt),
+    promptLength: params.prompt.length,
+    modelId:      params.modelId,
+    provider:     params.provider,
+    tier:         params.tier,
+    taskType:     params.taskType,
+    latencyMs:    params.latencyMs,
+    confidence:   params.confidence,
+    costUsd:      params.costUsd,
+    escalated:    params.escalated,
+  });
 }

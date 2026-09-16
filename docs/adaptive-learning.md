@@ -42,13 +42,13 @@ Where `α` (`EMA_ALPHA`, default `0.2`) controls how quickly the average respond
 
 ## Persistence
 
-Performance stats are persisted to Supabase (PostgreSQL) after every request via `PerformanceStore` (`src/services/performanceStore.ts`). This means:
+Performance stats are persisted to Postgres after every request via `PerformanceStore` (`src/services/performanceStore.ts`). This means:
 
 - Stats survive server restarts.
 - Multiple server instances share the same learning data.
 - Historical trends are queryable for offline analysis.
 
-The SQL schema is defined in `backend/supabase/migrations/003_ema_performance.sql`.
+The table is defined in `backend/src/db/schema.ts` and the update function in `backend/drizzle/0001_record_performance.sql`.
 
 ---
 
@@ -75,7 +75,7 @@ EMA stats only improve exploitation — choosing the known best option. To disco
 
 ## Request Logging
 
-In addition to EMA stats, every completed request is written to a `request_logs` table in Supabase. This provides a full audit trail and enables future features like:
+In addition to EMA stats, every completed request is written to a `request_logs` table in Postgres. This provides a full audit trail and enables future features like:
 
 - Manual performance review
 - Cost reporting per time period

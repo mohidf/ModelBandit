@@ -2,7 +2,7 @@
  * keys.test.ts
  *
  * Tests for the /keys route — GET, POST, DELETE.
- * Supabase and auth middleware are fully mocked.
+ * The key store and auth middleware are mocked; no database is touched.
  */
 
 import express from 'express';
@@ -26,31 +26,17 @@ jest.mock('../middleware/auth', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock Supabase
+// Mock the key store
 // ---------------------------------------------------------------------------
 
-const mockSelect  = jest.fn();
-const mockUpsert  = jest.fn();
-const mockDelete  = jest.fn();
-const mockEq      = jest.fn();
-const mockEq2     = jest.fn();
-const mockEqChain = jest.fn();
+const mockListKeyProviders = jest.fn();
+const mockUpsertKey        = jest.fn();
+const mockDeleteKey        = jest.fn();
 
-// Build a chainable query mock
-function buildSelectChain(result: { data: unknown; error: unknown }) {
-  const chain = {
-    eq: jest.fn().mockReturnValue({ data: result.data, error: result.error }),
-  };
-  return chain;
-}
-
-const mockFrom = jest.fn();
-
-jest.mock('../lib/supabase', () => ({
-  getSupabaseClient: () => ({
-    from: mockFrom,
-    auth: { getUser: jest.fn() },
-  }),
+jest.mock('../services/userKeyService', () => ({
+  listKeyProviders: (...args: unknown[]) => mockListKeyProviders(...args),
+  upsertKey:        (...args: unknown[]) => mockUpsertKey(...args),
+  deleteKey:        (...args: unknown[]) => mockDeleteKey(...args),
 }));
 
 // Import after mocks
@@ -69,46 +55,19 @@ app.use('/keys', keysRouter);
 // Helpers
 // ---------------------------------------------------------------------------
 
-function setupSelectMock(data: unknown[], error: unknown = null) {
-  mockFrom.mockReturnValue({
-    select: jest.fn().mockReturnValue({
-      eq: jest.fn().mockReturnValue({ data, error }),
-    }),
-    upsert: jest.fn().mockReturnValue({ error: null }),
-    delete: jest.fn().mockReturnValue({
-      eq: jest.fn().mockReturnValue({
-        eq: jest.fn().mockReturnValue({ error: null }),
-      }),
-    }),
-  });
+function setupSelectMock(rows: Array<{ provider: string; updatedAt: Date }>, error: unknown = null) {
+  if (error) mockListKeyProviders.mockRejectedValue(new Error(String((error as { message?: string }).message ?? error)));
+  else       mockListKeyProviders.mockResolvedValue(rows);
 }
 
 function setupUpsertMock(error: unknown = null) {
-  mockFrom.mockReturnValue({
-    select: jest.fn().mockReturnValue({
-      eq: jest.fn().mockReturnValue({ data: [], error: null }),
-    }),
-    upsert: jest.fn().mockReturnValue({ error }),
-    delete: jest.fn().mockReturnValue({
-      eq: jest.fn().mockReturnValue({
-        eq: jest.fn().mockReturnValue({ error: null }),
-      }),
-    }),
-  });
+  if (error) mockUpsertKey.mockRejectedValue(new Error(String((error as { message?: string }).message ?? error)));
+  else       mockUpsertKey.mockResolvedValue(undefined);
 }
 
 function setupDeleteMock(error: unknown = null) {
-  mockFrom.mockReturnValue({
-    select: jest.fn().mockReturnValue({
-      eq: jest.fn().mockReturnValue({ data: [], error: null }),
-    }),
-    upsert: jest.fn().mockReturnValue({ error: null }),
-    delete: jest.fn().mockReturnValue({
-      eq: jest.fn().mockReturnValue({
-        eq: jest.fn().mockReturnValue({ error }),
-      }),
-    }),
-  });
+  if (error) mockDeleteKey.mockRejectedValue(new Error(String((error as { message?: string }).message ?? error)));
+  else       mockDeleteKey.mockResolvedValue(undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,8 +98,8 @@ describe('GET /keys', () => {
 
   it('returns masked keys — never actual key values', async () => {
     setupSelectMock([
-      { provider: 'openai',     api_key: 'sk-openai-real-key-12345', updated_at: '2025-01-01T00:00:00Z' },
-      { provider: 'anthropic',  api_key: 'sk-ant-real-key-abc',      updated_at: '2025-01-02T00:00:00Z' },
+      { provider: 'openai',    updatedAt: new Date('2025-01-01T00:00:00Z') },
+      { provider: 'anthropic', updatedAt: new Date('2025-01-02T00:00:00Z') },
     ]);
 
     const res = await request(app)

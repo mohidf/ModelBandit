@@ -7,7 +7,7 @@
 // Required env var validation — call once at startup before app.listen()
 // ---------------------------------------------------------------------------
 
-const REQUIRED_ENV_VARS = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'] as const;
+const REQUIRED_ENV_VARS = ['DATABASE_URL', 'BETTER_AUTH_SECRET'] as const;
 
 /**
  * Throws at startup if any required environment variable is absent.

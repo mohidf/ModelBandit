@@ -1,52 +1,44 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import type { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { useSession, signOut as authSignOut } from '../lib/auth';
 import { AuthContext } from './useAuth';
 
-const NEW_USER_KEY  = 'mr_is_new_user';
 const ONBOARDED_KEY = 'mr_onboarded';
 
+function onboardedUsers(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(ONBOARDED_KEY) ?? '[]') as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
 /**
- * Holds the Supabase session for the whole app.
- * `isNewUser` is true from the first sign-in until the onboarding page clears it.
+ * Exposes the Better Auth session to the app.
+ * `isNewUser` is true for an account that has never dismissed the onboarding
+ * page in this browser. It's tracked per user ID so a shared machine works.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser]           = useState<User | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [isNewUser, setIsNewUser] = useState(() => localStorage.getItem(NEW_USER_KEY) === 'true');
+  const { data, isPending } = useSession();
+  const user = data?.user ?? null;
+  const [onboarded, setOnboarded] = useState<Set<string>>(onboardedUsers);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    localStorage.setItem(ONBOARDED_KEY, JSON.stringify([...onboarded]));
+  }, [onboarded]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-
-      if (event === 'SIGNED_IN' && localStorage.getItem(ONBOARDED_KEY) !== 'true') {
-        localStorage.setItem(NEW_USER_KEY, 'true');
-        setIsNewUser(true);
-      }
-      if (event === 'SIGNED_OUT') setIsNewUser(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const isNewUser = user !== null && !onboarded.has(user.id);
 
   function clearNewUser(): void {
-    localStorage.removeItem(NEW_USER_KEY);
-    localStorage.setItem(ONBOARDED_KEY, 'true');
-    setIsNewUser(false);
+    if (user) setOnboarded(prev => new Set(prev).add(user.id));
   }
 
   async function signOut(): Promise<void> {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw new Error(error.message);
+    const { error } = await authSignOut();
+    if (error) throw new Error(error.message ?? 'Sign out failed.');
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, isNewUser, clearNewUser, signOut }}>
+    <AuthContext.Provider value={{ user, loading: isPending, isNewUser, clearNewUser, signOut }}>
       {children}
     </AuthContext.Provider>
   );

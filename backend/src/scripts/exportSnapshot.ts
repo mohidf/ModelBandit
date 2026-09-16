@@ -8,7 +8,7 @@
  *
  *   cd backend && npm run export:snapshot
  *
- * Needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in backend/.env.
+ * Needs DATABASE_URL in backend/.env.
  */
 
 import 'dotenv/config';

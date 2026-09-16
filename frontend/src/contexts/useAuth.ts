@@ -1,8 +1,13 @@
 import { createContext, useContext } from 'react';
-import type { User } from '@supabase/supabase-js';
+
+export interface AuthUser {
+  id:    string;
+  email: string;
+  name:  string;
+}
 
 export interface AuthContextValue {
-  user:         User | null;
+  user:         AuthUser | null;
   loading:      boolean;
   isNewUser:    boolean;
   signOut:      () => Promise<void>;

@@ -29,26 +29,27 @@ Each request goes through four steps:
 3. **Run** - call the provider, and if the classifier wasn't confident, retry one tier up
 4. **Learn** - fold the result into that model's running averages for next time
 
-The backend is Node and TypeScript on Express, with Postgres (Supabase) for the
-performance history and user accounts. The frontend is React. There are three
+The backend is Node and TypeScript on Express, with Postgres (on Neon, through
+Drizzle) for the performance history and Better Auth for accounts. The frontend
+is React. There are three
 real providers wired up - Together AI, OpenAI and Anthropic - plus Groq for a
 free tier when a user hasn't added any keys of their own.
 
 ## Running it
 
-You need Node 18+, a Supabase project, and at least one provider key.
+You need Node 18+, a Postgres database, and at least one provider key. I use
+a free [Neon](https://neon.tech) project; a local Postgres works the same.
 
 ```bash
 git clone https://github.com/mohidf/ModelRouter.git
 cd ModelRouter
 npm run install:all
 
-cp backend/.env.example backend/.env       # fill in Supabase + provider keys
-cp frontend/.env.example frontend/.env.local   # Supabase URL + anon key
+cp backend/.env.example backend/.env   # DATABASE_URL, BETTER_AUTH_SECRET, provider keys
+cd backend && npm run db:migrate       # creates the tables and the EMA function
 ```
 
-Run the SQL files in `backend/supabase/migrations/` against your project in
-order, then:
+Then:
 
 ```bash
 npm run backend:dev    # http://localhost:3000
@@ -63,7 +64,8 @@ The keys that matter:
 
 | variable | what it's for |
 |---|---|
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | required - performance history, accounts, saved keys |
+| `DATABASE_URL` | required - a Postgres connection string |
+| `BETTER_AUTH_SECRET` | required - random string that signs session cookies |
 | `TOGETHER_API_KEY` | the default provider for most task types |
 | `OPENAI_API_KEY` | GPT-4o as a fallback, and the embedding step of the classifier |
 | `ANTHROPIC_API_KEY` | Claude, used for research and as an escalation target |
@@ -72,6 +74,10 @@ The keys that matter:
 
 Users can also save their own provider keys from the settings page. When they
 do, their key is used instead of the server's for that provider.
+
+Accounts are email and password through Better Auth, which stores its users and
+sessions in the same database. Sessions are cookies, so the frontend never
+handles a token.
 
 ## How it decides
 
@@ -158,8 +164,9 @@ low enough that it doesn't matter much.
 ### Learning
 
 After every call the model's row is updated with an exponential moving average
-(alpha 0.2) of each metric. That's done in a Postgres function so two concurrent
-requests for the same model can't race each other. Alpha 0.2 means the last
+(alpha 0.2) of each metric. That's done in a Postgres function (one `INSERT ...
+ON CONFLICT` statement) so two concurrent requests for the same model can't race
+each other. Alpha 0.2 means the last
 five or so calls dominate, which is enough to react when a provider has a slow
 day and stable enough not to flip-flop on one outlier.
 
@@ -180,7 +187,7 @@ totals since the backend last started. **History** is your last 20 requests.
 
 ## API
 
-`POST /route` with a Bearer token from Supabase auth:
+`POST /route`, with the session cookie from signing in:
 
 ```json
 { "prompt": "Explain binary search trees", "maxTokens": 1024, "optimizationMode": "balanced" }
@@ -214,7 +221,7 @@ the rest to 200.
 cd backend && npm test
 ```
 
-158 tests. The classifier ones are mostly prompts I got wrong at some point
+155 tests. The classifier ones are mostly prompts I got wrong at some point
 pinned so they stay right: "create a bar chart with D3" is code, not vision;
 "explain how hash maps work" is general, not code; "in the history of
 computing" is not research.
@@ -243,6 +250,7 @@ backend/src/
     scoring.ts                 the score formula and per-task weights, pure
     strategyEngine.ts          ranks models with it, adds env overrides and the 10% exploration
     performanceStore.ts        read/write the running averages in Postgres
+    historyStore.ts, userKeyService.ts   the user's history and saved provider keys
     router.ts                  the whole pipeline: classify, choose, run, escalate, record
     metrics.ts                 in-memory totals for GET /metrics
   providers/
@@ -253,11 +261,13 @@ backend/src/
     claudeProvider.ts           |
     groqProvider.ts            /  free tier only
     index.ts                   wires providers to task types
-  middleware/                  auth (Supabase JWT), rate limiter, error handler, logger
+  db/schema.ts                 every table, in Drizzle's schema DSL
+  lib/auth.ts                  Better Auth config (email + password, cookie sessions)
+  middleware/                  auth (session lookup), rate limiter, error handler, logger
   routes/                      route, performance, metrics, history, keys
   scripts/benchmark.ts         the 50-prompt benchmark
   __tests__/                   Jest
-backend/supabase/migrations/   schema, in order
+backend/drizzle/               SQL migrations generated from the schema, plus the EMA function
 
 frontend/src/
   App.tsx                      shell, routing, the prompt page

@@ -4,7 +4,7 @@
  * Unit tests for StrategyEngine.
  *
  * Why this module needs mocking:
- *   StrategyEngine imports two singletons — performanceStore (Supabase-backed)
+ *   StrategyEngine imports two singletons — performanceStore (Postgres-backed)
  *   and providerManager (registry of real provider instances). In unit tests
  *   we replace both with controlled fakes so tests are:
  *     - Fast: no network calls
@@ -368,7 +368,7 @@ describe('StrategyEngine — score normalisation', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 4b. DB error resilience — getAllStats() failure falls back to static routing
 //
-// If the Supabase client throws (network down, auth error, timeout), the
+// If the database client throws (network down, auth error, timeout), the
 // engine must fall back to static routing rather than bubbling an unhandled
 // rejection to the caller and returning a 500 to the user.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -376,10 +376,10 @@ describe('StrategyEngine — score normalisation', () => {
 describe('StrategyEngine — DB error resilience', () => {
 
   it('falls back to static routing when getAllStats() throws', async () => {
-    // Why: Supabase can fail transiently (network, cold start, quota exceeded).
+    // Why: the database can fail transiently (network, cold start, connection limit).
     // The router must remain functional and serve users with the static fallback
     // rather than propagating a 500. Broken performance DB ≠ broken router.
-    mockGetAllStats.mockRejectedValue(new Error('Supabase connection timeout'));
+    mockGetAllStats.mockRejectedValue(new Error('connection timeout'));
 
     const engine   = new StrategyEngine(0);
     const decision = await engine.choose('coding', 'medium');

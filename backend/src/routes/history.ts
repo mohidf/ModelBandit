@@ -1,83 +1,48 @@
 /**
  * history.ts
  *
- * GET  /history     — Fetch the authenticated user's last 20 history entries
- * POST /history     — Save a new history entry
- * DELETE /history   — Clear all history for the authenticated user
+ * GET    /history — the signed-in user's last 20 entries, newest first
+ * POST   /history — save an entry
+ * DELETE /history — clear everything
  */
 
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { getSupabaseClient } from '../lib/supabase';
+import { listHistory, addHistory, clearHistory, type HistoryRow } from '../services/historyStore';
 
 const router = Router();
 
-// GET /history
+function toJson(row: HistoryRow) {
+  return { id: row.id, prompt: row.prompt, result: row.result, created_at: row.createdAt.toISOString() };
+}
+
 router.get('/', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { data, error } = await getSupabaseClient()
-      .from('user_history')
-      .select('id, prompt, result, created_at')
-      .eq('user_id', req.userId!)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (error) { res.status(500).json({ error: 'Failed to fetch history.' }); return; }
-
-    res.json({ history: data ?? [] });
+    const rows = await listHistory(req.userId as string);
+    res.json({ history: rows.map(toJson) });
   } catch (err) {
     next(err);
   }
 });
 
-// POST /history
 router.post('/', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const { prompt, result } = req.body ?? {};
-
   if (!prompt || typeof prompt !== 'string' || !result || typeof result !== 'object') {
     res.status(400).json({ error: 'prompt and result are required.' });
     return;
   }
 
   try {
-    // Keep only the latest 20 entries — delete oldest if over limit before inserting.
-    const supabase = getSupabaseClient();
-
-    const { data: existing } = await supabase
-      .from('user_history')
-      .select('id, created_at')
-      .eq('user_id', req.userId!)
-      .order('created_at', { ascending: false });
-
-    if (existing && existing.length >= 20) {
-      const toDelete = existing.slice(19).map((r: { id: string }) => r.id);
-      await supabase.from('user_history').delete().in('id', toDelete);
-    }
-
-    const { data, error } = await supabase
-      .from('user_history')
-      .insert({ user_id: req.userId!, prompt, result })
-      .select('id, prompt, result, created_at')
-      .single();
-
-    if (error) { res.status(500).json({ error: 'Failed to save history.' }); return; }
-
-    res.status(201).json({ entry: data });
+    const entry = await addHistory(req.userId as string, prompt, result);
+    res.status(201).json({ entry: toJson(entry) });
   } catch (err) {
     next(err);
   }
 });
 
-// DELETE /history
 router.delete('/', requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { error } = await getSupabaseClient()
-      .from('user_history')
-      .delete()
-      .eq('user_id', req.userId!);
-
-    if (error) { res.status(500).json({ error: 'Failed to clear history.' }); return; }
-
+    await clearHistory(req.userId as string);
     res.json({ ok: true });
   } catch (err) {
     next(err);

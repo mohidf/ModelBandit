@@ -12,6 +12,8 @@ import keysRouter        from './routes/keys';
 import historyRouter     from './routes/history';
 import { logger } from './utils/logger';
 import { hybridClassifier } from './services/hybridClassifier';
+import { toNodeHandler } from 'better-auth/node';
+import { auth } from './lib/auth';
 
 const app = express();
 
@@ -22,7 +24,12 @@ const app = express();
 app.set('trust proxy', 1);
 
 // --- Middleware ---
-app.use(cors({ origin: process.env.ALLOWED_ORIGIN ?? 'http://localhost:5173' }));
+// credentials: true so the browser sends the session cookie cross-origin in production.
+app.use(cors({ origin: process.env.ALLOWED_ORIGIN ?? 'http://localhost:5173', credentials: true }));
+
+// Better Auth reads the request body itself, so it must be mounted before express.json().
+app.all('/auth/*', toNodeHandler(auth));
+
 app.use(express.json({ limit: config.bodyLimit }));
 app.use(requestLogger);
 

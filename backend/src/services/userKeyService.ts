@@ -1,47 +1,58 @@
 /**
- * userKeyService.ts
+ * userKeyService.ts — everything that reads or writes user_api_keys.
  *
- * Fetches user-supplied API keys from the user_api_keys table.
- * Uses the service-role Supabase client so queries bypass RLS —
- * the userId filter is applied explicitly to scope to the calling user.
- *
- * Keys are returned as a provider→apiKey map.
- * Callers should pass the map into providers so they fall back to env vars
- * when a user has not supplied a key for a given provider.
+ * Keys are scoped by user ID on every query. Only getUserApiKeys() returns
+ * the actual key values, and only to the router, never to a client.
  */
 
-import { getSupabaseClient } from '../lib/supabase';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import { and, eq } from 'drizzle-orm';
+import { getDb, schema } from '../db';
 
 /** Map of provider name → API key for a single user. */
 export type UserApiKeyMap = Record<string, string>;
 
-// ---------------------------------------------------------------------------
-// Service
-// ---------------------------------------------------------------------------
+export interface StoredKeyInfo {
+  provider:  string;
+  updatedAt: Date;
+}
 
 /**
  * Fetch all API keys stored for the given user.
- * Returns an empty map if the user has no keys or a DB error occurs.
- * Errors are silently absorbed — a missing key causes graceful fallback
- * to the system environment key rather than a hard failure.
+ * Returns an empty map on any error so a key lookup can never block a request.
  */
 export async function getUserApiKeys(userId: string): Promise<UserApiKeyMap> {
-  const supabase = getSupabaseClient();
-
-  const { data, error } = await supabase
-    .from('user_api_keys')
-    .select('provider, api_key')
-    .eq('user_id', userId);
-
-  if (error || !data) return {};
-
-  const map: UserApiKeyMap = {};
-  for (const row of data) {
-    map[row.provider as string] = row.api_key as string;
+  try {
+    const rows = await getDb()
+      .select({ provider: schema.userApiKeys.provider, apiKey: schema.userApiKeys.apiKey })
+      .from(schema.userApiKeys)
+      .where(eq(schema.userApiKeys.userId, userId));
+    return Object.fromEntries(rows.map(r => [r.provider, r.apiKey]));
+  } catch {
+    return {};
   }
-  return map;
+}
+
+/** Which providers the user has a key for. Never includes the key itself. */
+export async function listKeyProviders(userId: string): Promise<StoredKeyInfo[]> {
+  return getDb()
+    .select({ provider: schema.userApiKeys.provider, updatedAt: schema.userApiKeys.updatedAt })
+    .from(schema.userApiKeys)
+    .where(eq(schema.userApiKeys.userId, userId));
+}
+
+/** Insert or replace the user's key for one provider. */
+export async function upsertKey(userId: string, provider: string, apiKey: string): Promise<void> {
+  await getDb()
+    .insert(schema.userApiKeys)
+    .values({ userId, provider, apiKey })
+    .onConflictDoUpdate({
+      target: [schema.userApiKeys.userId, schema.userApiKeys.provider],
+      set:    { apiKey, updatedAt: new Date() },
+    });
+}
+
+export async function deleteKey(userId: string, provider: string): Promise<void> {
+  await getDb()
+    .delete(schema.userApiKeys)
+    .where(and(eq(schema.userApiKeys.userId, userId), eq(schema.userApiKeys.provider, provider)));
 }

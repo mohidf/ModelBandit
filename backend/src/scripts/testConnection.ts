@@ -1,43 +1,39 @@
 /**
  * testConnection.ts
  * Run with: npm run test:db
- * Verifies the Supabase connection and that the expected tables exist.
+ * Checks that DATABASE_URL works and the migrations have been applied.
  */
 
 import 'dotenv/config';
-import { getSupabaseClient } from '../lib/supabase';
+import { count, sql } from 'drizzle-orm';
+import { getDb, schema } from '../db';
 
 async function main(): Promise<void> {
-  const sb = getSupabaseClient();
-  console.log('Connecting to Supabase…');
+  const db = getDb();
+  process.stdout.write('Connecting…\n');
 
-  // Check performance_stats
-  const { error: e1, count: c1 } = await sb
-    .from('performance_stats')
-    .select('*', { count: 'exact', head: true });
+  const tables = [
+    ['user',              schema.user],
+    ['performance_stats', schema.performanceStats],
+    ['request_logs',      schema.requestLogs],
+    ['user_api_keys',     schema.userApiKeys],
+    ['user_history',      schema.userHistory],
+  ] as const;
 
-  if (e1) {
-    console.error('✗ performance_stats:', e1.message);
-    process.exit(1);
+  for (const [name, table] of tables) {
+    const [{ n }] = await db.select({ n: count() }).from(table);
+    process.stdout.write(`ok  ${name.padEnd(18)} ${n} rows\n`);
   }
-  console.log(`✓ performance_stats  (${c1 ?? 0} rows)`);
 
-  // Check request_logs
-  const { error: e2, count: c2 } = await sb
-    .from('request_logs')
-    .select('*', { count: 'exact', head: true });
-
-  if (e2) {
-    console.error('✗ request_logs:', e2.message);
-    console.error('  → Run migration 002_request_logs.sql in the Supabase SQL editor first.');
-    process.exit(1);
-  }
-  console.log(`✓ request_logs       (${c2 ?? 0} rows)`);
-
-  console.log('\nAll checks passed.');
+  const fn = await db.execute(sql`SELECT 1 FROM pg_proc WHERE proname = 'record_performance'`);
+  if (fn.rows.length === 0) throw new Error('record_performance() is missing. Run npm run db:migrate.');
+  process.stdout.write('ok  record_performance()\n');
 }
 
-main().catch(err => {
-  console.error('Unexpected error:', err);
-  process.exit(1);
-});
+main()
+  .then(() => process.exit(0))
+  .catch(err => {
+    process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
+    process.stderr.write('If tables are missing, run: npm run db:migrate\n');
+    process.exit(1);
+  });

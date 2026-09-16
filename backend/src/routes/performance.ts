@@ -23,7 +23,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
 
   // Fire all 11 domain queries in parallel rather than sequentially.
   // Promise.allSettled guarantees every slot is filled even if individual
-  // Supabase calls fail — a single domain error never blocks the others.
+  // database calls fail — a single domain error never blocks the others.
   const results = await Promise.allSettled(
     DOMAINS.map(domain => strategyEngine.rankStats(domain)),
   );
