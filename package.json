@@ -1,7 +1,7 @@
 {
-  "name": "model-router-ai",
+  "name": "model-bandit",
   "version": "1.0.0",
-  "description": "Self-optimizing AI model router — dynamically selects the best LLM provider based on task type, cost, and historical performance.",
+  "description": "Classifies each prompt and sends it to the cheapest model that should handle it, learning from every call like a bandit.",
   "private": true,
   "scripts": {
     "backend:dev": "cd backend && npm run dev",

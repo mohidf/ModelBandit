@@ -1,6 +1,6 @@
 # Routing Strategy
 
-This document explains how ModelRouter decides which LLM provider and model tier to use for each request.
+This document explains how ModelBandit decides which LLM provider and model tier to use for each request.
 
 ---
 

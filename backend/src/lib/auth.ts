@@ -13,7 +13,7 @@ import { getDb, schema } from '../db';
 const allowedOrigin = process.env.ALLOWED_ORIGIN ?? 'http://localhost:5173';
 
 export const auth = betterAuth({
-  appName:  'ModelRouter',
+  appName:  'ModelBandit',
   baseURL:  process.env.BETTER_AUTH_URL ?? `http://localhost:${process.env.PORT ?? '3000'}`,
   basePath: '/auth',
   secret:   process.env.BETTER_AUTH_SECRET,

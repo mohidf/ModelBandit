@@ -82,7 +82,7 @@ validateRequiredEnv();
 
 // --- Start ---
 app.listen(config.port, () => {
-  logger.info('ModelRouter AI backend running', {
+  logger.info('ModelBandit backend running', {
     port: config.port,
     env: process.env.NODE_ENV ?? 'development',
     confidenceThreshold: config.confidenceThreshold,

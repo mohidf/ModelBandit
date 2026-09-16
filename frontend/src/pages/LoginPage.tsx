@@ -40,7 +40,7 @@ export function LoginPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>ModelRouter</h1>
+        <h1>ModelBandit</h1>
         <p className="muted" style={{ marginTop: 6 }}>
           Sends each prompt to the cheapest model that should handle it, and keeps score of how each one does.
         </p>

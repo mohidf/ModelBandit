@@ -1,6 +1,6 @@
 # Provider Abstraction
 
-This document describes how ModelRouter abstracts over multiple LLM providers so that new ones can be added with minimal changes.
+This document describes how ModelBandit abstracts over multiple LLM providers so that new ones can be added with minimal changes.
 
 ---
 

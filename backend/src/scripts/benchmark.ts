@@ -304,7 +304,7 @@ async function checkServer(): Promise<void> {
 
 async function runBenchmark(): Promise<void> {
   console.log('\n' + hr('═'));
-  console.log('  ModelRouter AI Benchmark — 50 prompts across 11 domains');
+  console.log('  ModelBandit benchmark — 50 prompts across 11 domains');
   console.log(`  Target: ${BASE_URL}   Max tokens: ${MAX_TOKENS}   Delay: ${REQUEST_DELAY}ms`);
   console.log('  Columns: [seq] DIFFICULTY domain  ›  prompt (55 chars)  RESULT  latency  cost');
   console.log(hr('═'));

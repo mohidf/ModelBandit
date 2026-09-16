@@ -1,4 +1,4 @@
-# ModelRouter
+# ModelBandit
 
 A service that reads an LLM prompt, works out what kind of task it is, and sends
 it to the cheapest model that should be able to handle it. It keeps score of how
@@ -8,9 +8,13 @@ I built it because I kept paying GPT-4o prices for prompts like "what's the
 capital of Peru". Most prompts don't need the best model, but you can't tell
 which ones do without looking at them first - so this looks at them first.
 
+The name is from the multi-armed bandit problem: every model is an arm, every
+request is a pull, and the router balances exploiting the arm that's paid off
+best so far against exploring the others. That's the epsilon-greedy part below.
+
 ## Try it in your browser
 
-**[mohidf.github.io/ModelRouter](https://mohidf.github.io/ModelRouter/)**
+**[mohidf.github.io/ModelBandit](https://mohidf.github.io/ModelBandit/)**
 
 Type a prompt and it shows what the router would do with it: which task type
 the regexes voted for and why, how confident that vote was, and which model
@@ -41,8 +45,8 @@ You need Node 18+, a Postgres database, and at least one provider key. I use
 a free [Neon](https://neon.tech) project; a local Postgres works the same.
 
 ```bash
-git clone https://github.com/mohidf/ModelRouter.git
-cd ModelRouter
+git clone https://github.com/mohidf/ModelBandit.git
+cd ModelBandit
 npm run install:all
 
 cp backend/.env.example backend/.env   # DATABASE_URL, BETTER_AUTH_SECRET, provider keys

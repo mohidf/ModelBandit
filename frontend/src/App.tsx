@@ -38,7 +38,7 @@ function TopBar({ historyCount }: { historyCount: number }) {
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <Link to="/" className="wordmark">ModelRouter</Link>
+        <Link to="/" className="wordmark">ModelBandit</Link>
         <nav className="topnav" aria-label="Main">
           <NavLink to="/" end>Prompt</NavLink>
           <NavLink to="/history">History{historyCount > 0 ? ` (${historyCount})` : ''}</NavLink>

@@ -1,7 +1,7 @@
 {
-  "name": "model-router-ai-backend",
+  "name": "model-bandit-backend",
   "version": "1.0.0",
-  "description": "ModelRouter AI — intelligent LLM routing backend",
+  "description": "ModelBandit backend: classifies prompts and routes them to the cheapest capable model",
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",

@@ -1,12 +1,12 @@
 # Adaptive Learning
 
-This document explains how ModelRouter improves routing decisions over time using exponential moving averages (EMA).
+This document explains how ModelBandit improves routing decisions over time using exponential moving averages (EMA).
 
 ---
 
 ## Overview
 
-Every time a provider call completes, ModelRouter records the outcome and updates a per-(provider, tier, taskType) performance bucket. These buckets are used by the strategy engine to score and rank models on the next request.
+Every time a provider call completes, ModelBandit records the outcome and updates a per-(provider, tier, taskType) performance bucket. These buckets are used by the strategy engine to score and rank models on the next request.
 
 ---
 
