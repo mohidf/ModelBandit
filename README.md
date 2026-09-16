@@ -35,9 +35,8 @@ Each request goes through four steps:
 
 The backend is Node and TypeScript on Express, with Postgres (on Neon, through
 Drizzle) for the performance history and Better Auth for accounts. The frontend
-is React. There are three
-real providers wired up - OpenRouter, OpenAI and Anthropic - plus Groq for a
-free tier when a user hasn't added any keys of their own.
+is React. Every model is called through OpenRouter - the open-weight ones and
+GPT-4o and Claude alike - so there is one provider class and one key.
 
 ## Running it
 
@@ -60,10 +59,9 @@ npm run backend:dev    # http://localhost:3000
 npm run frontend:dev   # http://localhost:5173, proxies /api to the backend
 ```
 
-Sign up in the browser and send a prompt. A user with no saved keys gets the
-free Groq tier if the server has a Groq key, otherwise full routing on the
-server's own provider keys, so on your own machine you don't need to paste
-anything. Keys saved on the settings page take precedence over the server's.
+Sign up in the browser and send a prompt. A user with no saved key routes on
+the server's OpenRouter key, so on your own machine you don't need to paste
+anything. A key saved on the settings page takes precedence.
 
 The keys that matter:
 
@@ -71,18 +69,32 @@ The keys that matter:
 |---|---|
 | `DATABASE_URL` | required - a Postgres connection string |
 | `BETTER_AUTH_SECRET` | required - random string that signs session cookies |
-| `OPENROUTER_API_KEY` | the default provider for most task types: Llama, Qwen and DeepSeek through one key |
-| `OPENAI_API_KEY` | GPT-4o as a fallback, and the embedding step of the classifier |
-| `ANTHROPIC_API_KEY` | Claude, used for research and as an escalation target |
-| `GROQ_API_KEY` | free tier for users with no keys of their own |
+| `OPENROUTER_API_KEY` | every model call: Llama, Qwen, DeepSeek, GPT-4o and Claude through one key |
+| `OPENAI_API_KEY` | optional, only the classifier's embedding step |
 | `CONFIDENCE_THRESHOLD` | below this classifier confidence, escalate (default `0.20`) |
 
-Users can also save their own provider keys from the settings page. When they
-do, their key is used instead of the server's for that provider.
+Users can save their own OpenRouter key from the settings page. When they do,
+it is used instead of the server's.
 
 Accounts are email and password through Better Auth, which stores its users and
 sessions in the same database. Sessions are cookies, so the frontend never
 handles a token.
+
+### Hosting it
+
+One Docker image runs the whole thing: the backend serves the built frontend
+from the same origin, so sessions are plain first-party cookies.
+
+```bash
+docker build -t modelbandit .
+docker run -p 3000:3000 --env-file backend/.env modelbandit
+```
+
+`railway.json` points Railway at that Dockerfile. On any host, set the same
+variables as `backend/.env`, plus `BETTER_AUTH_URL` and `ALLOWED_ORIGIN` to the
+public URL (for example `https://modelbandit.up.railway.app`), and run
+`npm run db:migrate` once against the database. The GitHub Pages site is
+only the browser demo; it never talks to this server.
 
 ## How it decides
 
@@ -149,21 +161,23 @@ the tiers that make sense for the complexity. Without that it would find one
 good model per task type and never learn whether a cheaper one could do the job.
 
 If there's no history for a task type yet, it falls back to a static table:
-the task type picks the provider and the complexity picks the tier.
+each task type has a cheap, mid and premium model, and the complexity picks
+which. Most start on Llama 8B, Llama 70B and DeepSeek; research starts on
+Claude; vision on models that accept images.
 
 ### Escalating
 
 If classifier confidence came in below the threshold, the request runs again on
-the next tier up within the same provider, or on the fallback provider's premium
-tier if it was already at the top. Both calls are recorded and both are counted
-in the cost shown to the user.
+the task type's next tier up, or on its `escalateTo` model (GPT-4o for most)
+if it was already at premium. Both calls are recorded and both are counted in
+the cost shown to the user.
 
-Escalation is about a weak answer. A provider that fails outright - a timeout,
-an expired key, an account out of credit - is handled separately: the request
-goes once to the task type's other provider at the same tier, and the model
-that failed is recorded with zero confidence so the scorer steers away from it
-until it recovers. I added this after my Anthropic account ran out of credit
-mid-run and every research prompt turned into a 500.
+Escalation is about a weak answer. A call that fails outright - a timeout, a
+malformed response, a model that's been withdrawn - is handled separately: the
+request goes once to a different model at the same tier, and the model that
+failed is recorded with zero confidence so the scorer steers away from it
+until it recovers. I added this after an account ran out of credit mid-run
+and every research prompt turned into a 500.
 
 The important detail is what gets recorded. The first call is marked as having
 escalated, which raises that model's escalation rate. Early on I weighted
@@ -250,10 +264,10 @@ and latency percentiles. It needs real keys and takes a few minutes.
 
 ```
 backend/src/
-  index.ts                     Express app, rate limiters, startup warm-up
+  index.ts                     Express app, rate limiters, startup warm-up, serves frontend/dist in production
   config.ts                    every env var, parsed and validated once
   config/models.ts             the model registry: IDs, tiers, prices, context windows
-  config/routing.ts            the static fallback table: task type → provider, complexity → tier
+  config/routing.ts            the static fallback table: task type → cheap/mid/premium model, plus escalateTo
   services/
     classifier.ts              stage 1: weighted regexes
     embeddingClassifier.ts     stage 2: nearest anchor by cosine similarity
@@ -266,13 +280,10 @@ backend/src/
     router.ts                  the whole pipeline: classify, choose, run, escalate, record
     metrics.ts                 in-memory totals for GET /metrics
   providers/
-    baseProvider.ts            the interface every provider implements
-    providerManager.ts         registry, static routing table, escalation logic
-    openrouterProvider.ts      \
-    openaiProvider.ts           | one file per provider
-    claudeProvider.ts           |
-    groqProvider.ts            /  free tier only
-    index.ts                   wires providers to task types
+    baseProvider.ts            the interface a provider implements
+    providerManager.ts         resolve, escalate, fallback, dispatch
+    openrouterProvider.ts      the one provider: OpenAI-compatible client against OpenRouter
+    index.ts                   composition root
   db/schema.ts                 every table, in Drizzle's schema DSL
   lib/auth.ts                  Better Auth config (email + password, cookie sessions)
   middleware/                  auth (session lookup), rate limiter, error handler, logger
@@ -287,6 +298,7 @@ frontend/src/
   pages/                       login, onboarding, settings (API keys)
   utils/labels.ts              plain-English names for task types, tiers, providers
 
+Dockerfile, railway.json       one image for backend + built frontend; Railway config
 demo/                          the browser demo, published to GitHub Pages by .github/workflows/pages.yml
   src/main.ts                  imports the classifier, scoring and routing table straight from backend/src
   src/snapshot.json            performance table snapshot (refresh with npm run export:snapshot)
@@ -317,5 +329,8 @@ docs/                          longer notes on the routing strategy, learning, a
 - A regex for research that matched "history of" was routing "the history of
   computing" to Claude Opus. Anything that broad needs to be much more
   specific, or gone.
+- GPT-OSS 20B looked great on paper, cheapest and fastest, and then returned
+  an empty answer to a code prompt because it spent the whole token budget on
+  hidden reasoning. Not every cheap model is a bargain.
 - Metrics in different units can't share a weighted sum. Normalise first.
 - The classifier's confidence should measure the margin, not the match.

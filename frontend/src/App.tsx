@@ -120,17 +120,10 @@ function PromptPage({ onRouted }: PromptPageProps) {
     <div className="page stack">
       <PromptCard onSubmit={handleSubmit} loading={loading} />
 
-      {result?.freeTier && (
-        <p className="note">
-          You have no API keys saved, so this ran on Groq's free tier with a single fixed model.
-          <Link to="/settings"> Add a key</Link> to get routing across OpenRouter, OpenAI and Anthropic.
-        </p>
-      )}
-
       {noKeys && (
         <p className="note">
-          No API keys are saved for your account and the server has no free-tier key configured.
-          <Link to="/settings"> Add a key in Settings</Link> to start routing.
+          No API key is saved for your account and the server has none configured either.
+          <Link to="/settings"> Add an OpenRouter key in Settings</Link> to start routing.
         </p>
       )}
 

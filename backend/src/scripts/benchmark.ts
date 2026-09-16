@@ -12,7 +12,7 @@
  * Prerequisites:
  *   - Backend running at http://localhost:3000 (or set $BENCHMARK_URL)
  *   - OPENAI_API_KEY in backend/.env  (embedding classifier; falls back to rule-based without it)
- *   - At least one provider API key (ANTHROPIC_API_KEY / OPENROUTER_API_KEY / OPENAI_API_KEY)
+ *   - At least one provider API key (OPENROUTER_API_KEY)
  *
  * Usage:
  *   cd backend
@@ -20,7 +20,7 @@
  *   BENCHMARK_URL=http://staging.example.com ts-node src/scripts/benchmark.ts
  *
  * Expected runtime: ~3–6 minutes (50 sequential API calls, 500 ms delay between each)
- * Expected cost:    ~$0.01–0.05 (mostly cheap-tier OpenRouter / Haiku models)
+ * Expected cost:    ~$0.01–0.05 (mostly cheap-tier models)
  */
 
 // ---------------------------------------------------------------------------
@@ -536,14 +536,12 @@ function printSummary(results: BenchmarkResult[], wallMs: number): void {
   // ── ⑥ Model distribution ─────────────────────────────────────────────────
   // Short display names so the table fits the terminal width
   const MODEL_SHORT: Record<string, string> = {
-    'gpt-4o-mini':                                   'GPT-4o mini',
-    'gpt-4o':                                        'GPT-4o',
-    'claude-haiku-4-5-20251001':                     'Claude Haiku',
-    'claude-sonnet-4-6':                             'Claude Sonnet',
-    'claude-opus-4-6':                               'Claude Opus',
-    // OpenRouter
+    'openai/gpt-4o-mini':                            'GPT-4o mini',
+    'openai/gpt-4o':                                 'GPT-4o',
+    'anthropic/claude-haiku-4.5':                    'Claude Haiku',
+    'anthropic/claude-sonnet-4.6':                   'Claude Sonnet',
+    'anthropic/claude-opus-4.6':                     'Claude Opus',
     'meta-llama/llama-3.1-8b-instruct':              'Llama 3.1 8B',
-    'openai/gpt-oss-20b':                            'GPT-OSS 20B',
     'meta-llama/llama-3.3-70b-instruct':             'Llama 3.3 70B',
     'qwen/qwen-2.5-72b-instruct':                    'Qwen 2.5 72B',
     'meta-llama/llama-4-scout':                      'Llama 4 Scout',
@@ -659,7 +657,7 @@ function printInterpretation(p: InterpretationParams): void {
   ② Cost savings vs GPT-4o: ${p.savingsPct.toFixed(1)}%  →  ${costStatus}
 
      TARGET NUMBERS:
-       ≥ 65%  Router directing easy tasks to cheap/balanced tiers. Typical OpenRouter/Haiku range.
+       ≥ 65%  Router directing easy tasks to cheap/balanced tiers. Typical range.
        45–65% Mixed. Some domains legitimately hit premium (research, coding_debug).
        < 45%  Review ROUTING table in providers/index.ts — many tasks may map to premium providers.
 

@@ -133,10 +133,7 @@ beforeEach(() => {
   // return values here.
   mockResolve.mockReturnValue(MOCK_RESOLVED_MODEL);
   mockResolveByModelId.mockReturnValue(MOCK_RESOLVED_MODEL);
-  mockListProviders.mockReturnValue([
-    { name: 'openai',    tiers: { cheap: 'gpt-4o-mini', balanced: 'gpt-4o',             premium: 'gpt-4o'          } },
-    { name: 'anthropic', tiers: { cheap: 'claude-haiku', balanced: 'claude-sonnet-4-6',  premium: 'claude-opus-4-6' } },
-  ]);
+  mockListProviders.mockReturnValue(['openrouter']);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

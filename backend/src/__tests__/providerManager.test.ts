@@ -1,290 +1,177 @@
 /**
  * providerManager.test.ts
  *
- * Unit tests for ProviderManager.
- *
- * The ProviderManager is pure in-memory logic: no network calls, no DB.
- * We build a minimal registry with two mock providers and verify:
- *   1. Registration and lookup
- *   2. resolve() — domain + complexity → provider + model + tier
- *   3. resolveByModelId() — model ID lookup via MODEL_REGISTRY
- *   4. escalate() — same-provider tier upgrade, then cross-provider fallback
- *   5. Error paths — unregistered provider, unknown model ID
+ * ProviderManager is pure in-memory logic: no network, no DB. A mock
+ * provider named 'openrouter' stands in for the real one, since every model
+ * in the registry belongs to it. The routing table is a test fixture built
+ * from real registry IDs.
  */
 
 import { ProviderManager } from '../providers/providerManager';
-import type { ModelTierMap, RoutingConfig } from '../providers/providerManager';
+import type { RoutingConfig } from '../providers/providerManager';
 import type { IProvider, GenerateOptions, GenerateResult, CostEstimate } from '../providers/baseProvider';
 import type { ModelTier } from '../providers/types';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Minimal mock providers
-// ─────────────────────────────────────────────────────────────────────────────
+import { ALL_DOMAINS } from '../providers/types';
 
 function makeProvider(name: string): IProvider {
   return {
     name,
-    async generate(_prompt: string, model: string, _options: GenerateOptions): Promise<GenerateResult> {
+    async generate(_prompt: string, model: string, options: GenerateOptions): Promise<GenerateResult> {
       return {
         text: `response from ${name}/${model}`,
         inputTokens: 10, outputTokens: 20,
         latencyMs: 100, model, provider: name,
-        tier: 'cheap', modelConfidence: 1.0,
+        tier: options.tier, modelConfidence: 1.0,
       };
     },
     estimateCost(_model: string, _tier: ModelTier, _input: number, _output: number): CostEstimate {
-      return { inputCostUsd: 0, outputCostUsd: 0, tierMultiplier: 1, totalCostUsd: 0 };
+      return { inputCostUsd: 0.001, outputCostUsd: 0.002, tierMultiplier: 1, totalCostUsd: 0.003 };
     },
   };
 }
 
-const providerA = makeProvider('alpha');
-const providerB = makeProvider('beta');
+const CHEAP    = 'meta-llama/llama-3.1-8b-instruct';
+const MID      = 'meta-llama/llama-3.3-70b-instruct';
+const PREMIUM  = 'deepseek/deepseek-v3.2';
+const ESCALATE = 'openai/gpt-4o';
 
-const TIERS_A: ModelTierMap = { cheap: 'alpha-mini', balanced: 'alpha-std', premium: 'alpha-pro' };
-const TIERS_B: ModelTierMap = { cheap: 'beta-mini',  balanced: 'beta-std',  premium: 'beta-pro'  };
+const OPEN = { cheap: CHEAP, balanced: MID, premium: PREMIUM };
 
-const ROUTING: RoutingConfig = {
-  coding:        { providerName: 'alpha', fallbackProviderName: 'beta',  reason: 'alpha for coding'   },
-  math:          { providerName: 'beta',  fallbackProviderName: 'alpha', reason: 'beta for math'      },
-  creative:      { providerName: 'alpha',                                reason: 'alpha for creative'  },
-  general:       { providerName: 'beta',                                 reason: 'beta for general'    },
-  research:      { providerName: 'alpha', fallbackProviderName: 'beta',  reason: 'alpha for research'  },
-  summarization: { providerName: 'alpha', fallbackProviderName: 'beta',  reason: 'alpha for summ'      },
-  vision:        { providerName: 'alpha', fallbackProviderName: 'beta',  reason: 'alpha for vision'    },
-  coding_debug:  { providerName: 'alpha', fallbackProviderName: 'beta',  reason: 'alpha for debug'     },
-  general_chat:  { providerName: 'beta',  fallbackProviderName: 'alpha', reason: 'beta for chat'       },
-  multilingual:  { providerName: 'alpha', fallbackProviderName: 'beta',  reason: 'alpha for multi'     },
-  math_reasoning:{ providerName: 'beta',  fallbackProviderName: 'alpha', reason: 'beta for reasoning'  },
+const ROUTING: RoutingConfig = Object.fromEntries(
+  ALL_DOMAINS.map(d => [d, { models: OPEN, escalateTo: ESCALATE, reason: `route for ${d}` }]),
+) as RoutingConfig;
+// creative has no escalateTo; research uses a different ladder.
+ROUTING.creative = { models: OPEN, reason: 'route for creative' };
+ROUTING.research = {
+  models: { cheap: 'anthropic/claude-haiku-4.5', balanced: 'anthropic/claude-sonnet-4.6', premium: 'anthropic/claude-opus-4.6' },
+  escalateTo: ESCALATE,
+  reason: 'route for research',
 };
 
 function buildManager(): ProviderManager {
-  return new ProviderManager(ROUTING)
-    .register(providerA, TIERS_A)
-    .register(providerB, TIERS_B);
+  return new ProviderManager(ROUTING).register(makeProvider('openrouter'));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. Registration
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('ProviderManager — registration', () => {
-
-  it('registers a provider and returns it by name', () => {
-    const manager = buildManager();
-    expect(manager.getProvider('alpha')).toBe(providerA);
-    expect(manager.getProvider('beta')).toBe(providerB);
+  it('lists registered providers', () => {
+    expect(buildManager().listProviders()).toEqual(['openrouter']);
   });
 
-  it('throws when looking up an unregistered provider', () => {
-    const manager = buildManager();
-    expect(() => manager.getProvider('unknown')).toThrow(/unknown/);
+  it('throws for an unregistered provider', () => {
+    expect(() => buildManager().getProvider('nope')).toThrow(/not registered/);
   });
-
-  it('listProviders returns all registered providers with their tier maps', () => {
-    const manager = buildManager();
-    const list = manager.listProviders();
-    expect(list).toHaveLength(2);
-    const alpha = list.find(p => p.name === 'alpha')!;
-    expect(alpha.tiers).toEqual(TIERS_A);
-  });
-
-  it('getTiers returns the tier map for a registered provider', () => {
-    const manager = buildManager();
-    expect(manager.getTiers('alpha')).toEqual(TIERS_A);
-  });
-
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 2. resolve() — domain + complexity → provider + model + tier
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('ProviderManager — resolve()', () => {
-
-  it('routes coding to alpha provider', () => {
-    const manager = buildManager();
-    const resolved = manager.resolve('coding', 'low');
-    expect(resolved.provider).toBe(providerA);
+  it('maps low complexity to the cheap model', () => {
+    const r = buildManager().resolve('coding', 'low');
+    expect(r.model).toBe(CHEAP);
+    expect(r.tier).toBe('cheap');
+    expect(r.provider.name).toBe('openrouter');
   });
 
-  it('routes math to beta provider', () => {
-    const manager = buildManager();
-    const resolved = manager.resolve('math', 'medium');
-    expect(resolved.provider).toBe(providerB);
+  it('maps medium and high complexity to the mid tier (premium is reached by escalation)', () => {
+    expect(buildManager().resolve('coding', 'medium').model).toBe(MID);
+    expect(buildManager().resolve('coding', 'high').model).toBe(MID);
   });
 
-  it('maps low complexity to cheap tier', () => {
-    const manager = buildManager();
-    const resolved = manager.resolve('coding', 'low');
-    expect(resolved.tier).toBe('cheap');
-    expect(resolved.model).toBe(TIERS_A.cheap);
+  it('uses the domain-specific ladder', () => {
+    expect(buildManager().resolve('research', 'low').model).toBe('anthropic/claude-haiku-4.5');
   });
 
-  it('maps medium complexity to balanced tier', () => {
-    const manager = buildManager();
-    const resolved = manager.resolve('coding', 'medium');
-    expect(resolved.tier).toBe('balanced');
-    expect(resolved.model).toBe(TIERS_A.balanced);
+  it('includes the route reason', () => {
+    expect(buildManager().resolve('math', 'low').reason).toBe('route for math');
   });
-
-  it('maps high complexity to balanced tier (escalation promotes to premium)', () => {
-    // Why: COMPLEXITY_TO_TIER maps high → balanced, not premium.
-    // The escalation path handles the premium promotion when confidence is low.
-    // Direct routing to premium on high-complexity cold-starts would prevent
-    // the strategy engine from accumulating balanced-tier data.
-    const manager = buildManager();
-    const resolved = manager.resolve('coding', 'high');
-    expect(resolved.tier).toBe('balanced');
-  });
-
-  it('includes a non-empty reason string', () => {
-    const manager = buildManager();
-    const resolved = manager.resolve('coding', 'low');
-    expect(typeof resolved.reason).toBe('string');
-    expect(resolved.reason.length).toBeGreaterThan(0);
-  });
-
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 3. resolveByModelId() — uses MODEL_REGISTRY for lookup
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('ProviderManager — resolveByModelId()', () => {
-
-  it('resolves a real model from the registry', () => {
-    // Use a real registered provider so the manager can find it.
-    // The manager in this test only has 'alpha' and 'beta', but resolveByModelId
-    // looks up the model in MODEL_REGISTRY which references 'openai'/'anthropic'/'openrouter'.
-    // We use a separate manager with real providers wired up for this test.
-    //
-    // Rather than importing real providers (which would require API keys),
-    // we register a mock with the name that MODEL_REGISTRY expects.
-    const mockOpenai = makeProvider('openai');
-    const manager = new ProviderManager(ROUTING)
-      .register(mockOpenai, { cheap: 'gpt-4o-mini', balanced: 'gpt-4o-mini', premium: 'gpt-4o' });
-
-    const resolved = manager.resolveByModelId('gpt-4o-mini', 'test reason');
-    expect(resolved.provider).toBe(mockOpenai);
-    expect(resolved.model).toBe('gpt-4o-mini');
-    expect(resolved.tier).toBe('cheap');
-    expect(resolved.reason).toBe('test reason');
+  it('resolves a registry model with its registry tier', () => {
+    const r = buildManager().resolveByModelId('openai/gpt-4o-mini', 'test reason');
+    expect(r.model).toBe('openai/gpt-4o-mini');
+    expect(r.tier).toBe('cheap');
+    expect(r.reason).toBe('test reason');
   });
 
   it('throws when the model ID is not in the registry', () => {
-    const manager = buildManager();
-    expect(() => manager.resolveByModelId('nonexistent-model-xyz', 'test')).toThrow(/nonexistent-model-xyz/);
+    expect(() => buildManager().resolveByModelId('nonexistent-model-xyz', 't')).toThrow(/nonexistent-model-xyz/);
   });
 
-  it('throws when the model is in the registry but its provider is not registered', () => {
-    // gpt-4o-mini is in MODEL_REGISTRY under provider 'openai',
-    // but our test manager only has 'alpha' and 'beta'.
-    const manager = buildManager();
-    expect(() => manager.resolveByModelId('gpt-4o-mini', 'test')).toThrow(/openai/i);
+  it('throws when the provider for a registry model is not registered', () => {
+    const empty = new ProviderManager(ROUTING);
+    expect(() => empty.resolveByModelId(CHEAP, 't')).toThrow(/openrouter/);
   });
-
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 4. escalate() — tier upgrade and cross-provider fallback
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe('ProviderManager — escalate()', () => {
-
-  it('promotes cheap to balanced within the same provider', () => {
-    const manager = buildManager();
-    const initial = manager.resolve('coding', 'low');  // cheap
-    const escalated = manager.escalate(initial, 'coding');
-
-    expect(escalated).not.toBeNull();
-    expect(escalated!.tier).toBe('balanced');
-    expect(escalated!.provider).toBe(providerA);
-    expect(escalated!.model).toBe(TIERS_A.balanced);
+  it('goes one tier up within the domain ladder', () => {
+    const m = buildManager();
+    const fromCheap = m.escalate(m.resolve('coding', 'low'), 'coding');
+    expect(fromCheap?.model).toBe(MID);
+    expect(fromCheap?.tier).toBe('balanced');
+    const fromMid = m.escalate(fromCheap!, 'coding');
+    expect(fromMid?.model).toBe(PREMIUM);
+    expect(fromMid?.tier).toBe('premium');
   });
 
-  it('promotes balanced to premium within the same provider', () => {
-    const manager = buildManager();
-    const initial = manager.resolve('coding', 'medium');  // balanced
-    const escalated = manager.escalate(initial, 'coding');
-
-    expect(escalated).not.toBeNull();
-    expect(escalated!.tier).toBe('premium');
-    expect(escalated!.provider).toBe(providerA);
-    expect(escalated!.model).toBe(TIERS_A.premium);
+  it('goes to escalateTo when already at premium', () => {
+    const m = buildManager();
+    const atPremium = m.resolveByModelId(PREMIUM, 't');
+    const next = m.escalate(atPremium, 'coding');
+    expect(next?.model).toBe(ESCALATE);
+    expect(next?.tier).toBe('premium');
   });
 
-  it('cross-escalates to fallback provider when already at premium', () => {
-    // Why: when the primary provider is already at premium and confidence is
-    // still low, the only option is to try a different provider.
-    const manager = buildManager();
-    // Manually build a premium resolved model for alpha
-    const initial = { provider: providerA, model: TIERS_A.premium, tier: 'premium' as ModelTier, reason: 'test' };
-    const escalated = manager.escalate(initial, 'coding');  // fallback is 'beta'
-
-    expect(escalated).not.toBeNull();
-    expect(escalated!.provider).toBe(providerB);
-    expect(escalated!.tier).toBe('premium');
-    expect(escalated!.model).toBe(TIERS_B.premium);
+  it('returns null at premium when the domain has no escalateTo', () => {
+    const m = buildManager();
+    expect(m.escalate(m.resolveByModelId(PREMIUM, 't'), 'creative')).toBeNull();
   });
 
-  it('returns null when already at premium and no fallback provider is configured', () => {
-    // Why: some domains (creative) have no fallback — once at premium,
-    // escalation stops. Returning null signals the router to use the result as-is.
-    const manager = buildManager();
-    // creative has no fallbackProviderName
-    const initial = { provider: providerA, model: TIERS_A.premium, tier: 'premium' as ModelTier, reason: 'test' };
-    const escalated = manager.escalate(initial, 'creative');
-
-    expect(escalated).toBeNull();
+  it('returns null when already on the escalateTo model', () => {
+    const m = buildManager();
+    expect(m.escalate(m.resolveByModelId(ESCALATE, 't'), 'coding')).toBeNull();
   });
-
-  it('returns null when already at premium and fallback is the same as current', () => {
-    // Why: a routing config that accidentally sets fallback === primary must
-    // not cause infinite escalation — the manager must detect this and stop.
-    const routingWithSameFallback: RoutingConfig = {
-      ...ROUTING,
-      coding: { providerName: 'alpha', fallbackProviderName: 'alpha', reason: 'same fallback' },
-    };
-    const manager = new ProviderManager(routingWithSameFallback)
-      .register(providerA, TIERS_A)
-      .register(providerB, TIERS_B);
-
-    const initial = { provider: providerA, model: TIERS_A.premium, tier: 'premium' as ModelTier, reason: 'test' };
-    expect(manager.escalate(initial, 'coding')).toBeNull();
-  });
-
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 6. fallback() — same tier, the domain's other provider
-// ─────────────────────────────────────────────────────────────────────────────
-
 describe('ProviderManager — fallback()', () => {
+  it('prefers the domain ladder model at the same tier', () => {
+    const m = buildManager();
+    const failed = m.resolveByModelId('openai/gpt-4o-mini', 't');   // cheap, not the ladder's cheap model
+    const alt = m.fallback(failed, 'coding');
+    expect(alt?.model).toBe(CHEAP);
+    expect(alt?.tier).toBe('cheap');
+    expect(alt?.reason).toMatch(/after openai\/gpt-4o-mini failed/);
+  });
 
-  it('returns the fallback provider at the same tier', () => {
-    const manager = buildManager();
-    const resolved = manager.resolve('coding', 'medium');   // alpha, balanced
-    const alt = manager.fallback(resolved, 'coding');
+  it('picks another registry model of the same tier when the ladder model is the one that failed', () => {
+    const m = buildManager();
+    const alt = m.fallback(m.resolve('coding', 'low'), 'coding');
     expect(alt).not.toBeNull();
-    expect(alt!.provider.name).toBe('beta');
-    expect(alt!.tier).toBe('balanced');
-    expect(alt!.model).toBe('beta-std');
-    expect(alt!.reason).toMatch(/alpha failed/);
+    expect(alt!.model).not.toBe(CHEAP);
+    expect(alt!.tier).toBe('cheap');
   });
 
-  it('returns null when the domain has no fallback provider', () => {
-    const manager = buildManager();
-    const resolved = manager.resolve('creative', 'low');    // alpha, no fallback
-    expect(manager.fallback(resolved, 'creative')).toBeNull();
+  it('never returns the model that failed', () => {
+    const m = buildManager();
+    for (const tier of ['cheap', 'balanced', 'premium'] as const) {
+      const failed = m.resolve('research', tier === 'cheap' ? 'low' : 'medium');
+      const alt = m.fallback({ ...failed, tier }, 'research');
+      if (alt) expect(alt.model).not.toBe(failed.model);
+    }
   });
+});
 
-  it('returns null when the fallback is the provider that just failed', () => {
-    const manager = buildManager();
-    // math routes to beta with alpha as fallback; if alpha itself failed (say,
-    // after an escalation moved us there), there is nowhere else to go.
-    const onAlpha = manager.resolveExplicit('alpha', 'premium', 'test');
-    expect(manager.fallback(onAlpha, 'math')).toBeNull();
+describe('ProviderManager — dispatch()', () => {
+  it('passes the user key for the model provider and prices the result', async () => {
+    const provider = makeProvider('openrouter');
+    const spy = jest.spyOn(provider, 'generate');
+    const m = new ProviderManager(ROUTING).register(provider);
+    const { result, cost } = await m.dispatch(m.resolve('coding', 'low'), 'hi', {
+      maxTokens: 50, userApiKeys: { openrouter: 'sk-user' },
+    });
+    expect(spy).toHaveBeenCalledWith('hi', CHEAP, { maxTokens: 50, tier: 'cheap', apiKey: 'sk-user' });
+    expect(result.text).toContain(CHEAP);
+    expect(cost.totalCostUsd).toBe(0.003);
   });
-
 });

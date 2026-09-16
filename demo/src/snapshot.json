@@ -110,17 +110,6 @@
     "averageCostUsd": 0.000013
   },
   {
-    "modelId": "openai/gpt-oss-20b",
-    "provider": "openrouter",
-    "tier": "cheap",
-    "taskType": "math",
-    "totalRequests": 4,
-    "averageLatencyMs": 2301,
-    "averageConfidence": 1,
-    "escalationRate": 0.36,
-    "averageCostUsd": 0.000023
-  },
-  {
     "modelId": "meta-llama/llama-3.3-70b-instruct",
     "provider": "openrouter",
     "tier": "balanced",
@@ -147,11 +136,11 @@
     "provider": "openrouter",
     "tier": "cheap",
     "taskType": "multilingual",
-    "totalRequests": 5,
-    "averageLatencyMs": 1907,
+    "totalRequests": 6,
+    "averageLatencyMs": 1607,
     "averageConfidence": 1,
     "escalationRate": 0,
-    "averageCostUsd": 0.000007
+    "averageCostUsd": 0.000006
   },
   {
     "modelId": "meta-llama/llama-3.1-8b-instruct",
@@ -165,8 +154,19 @@
     "averageCostUsd": 0.000014
   },
   {
-    "modelId": "claude-haiku-4-5-20251001",
-    "provider": "anthropic",
+    "modelId": "meta-llama/llama-3.3-70b-instruct",
+    "provider": "openrouter",
+    "tier": "balanced",
+    "taskType": "research",
+    "totalRequests": 2,
+    "averageLatencyMs": 3294,
+    "averageConfidence": 1,
+    "escalationRate": 0,
+    "averageCostUsd": 0.000051
+  },
+  {
+    "modelId": "anthropic/claude-haiku-4.5",
+    "provider": "openrouter",
     "tier": "cheap",
     "taskType": "research",
     "totalRequests": 1,
@@ -174,17 +174,6 @@
     "averageConfidence": 0,
     "escalationRate": 1,
     "averageCostUsd": 0
-  },
-  {
-    "modelId": "meta-llama/llama-3.3-70b-instruct",
-    "provider": "openrouter",
-    "tier": "balanced",
-    "taskType": "research",
-    "totalRequests": 1,
-    "averageLatencyMs": 3398,
-    "averageConfidence": 1,
-    "escalationRate": 0,
-    "averageCostUsd": 0.000054
   },
   {
     "modelId": "meta-llama/llama-3.1-8b-instruct",
@@ -235,10 +224,10 @@
     "provider": "openrouter",
     "tier": "premium",
     "taskType": "vision",
-    "totalRequests": 2,
-    "averageLatencyMs": 7057,
+    "totalRequests": 3,
+    "averageLatencyMs": 7790,
     "averageConfidence": 1,
     "escalationRate": 0,
-    "averageCostUsd": 0.000068
+    "averageCostUsd": 0.000066
   }
 ]

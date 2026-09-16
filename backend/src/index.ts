@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import { existsSync } from 'fs';
+import { resolve } from 'path';
 import cors from 'cors';
 import express from 'express';
 import { config, validateRequiredEnv } from './config';
@@ -57,6 +59,22 @@ app.use('/history',     createRateLimiterMiddleware(metaLimiter),  historyRouter
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// --- Built frontend (production) ---
+// When frontend/dist exists next to the backend (the Docker image builds it
+// there), serve it from the same origin so the session cookie needs no
+// cross-site configuration. Any GET that isn't an API route gets index.html
+// and the React router takes it from there.
+const API_PREFIXES = ['/route', '/metrics', '/performance', '/keys', '/history', '/auth', '/health'];
+const frontendDist = process.env.FRONTEND_DIST ?? resolve(__dirname, '../../frontend/dist');
+if (existsSync(frontendDist)) {
+  app.use(express.static(frontendDist, { index: false, maxAge: '1h' }));
+  app.get('*', (req, res, next) => {
+    if (API_PREFIXES.some(p => req.path === p || req.path.startsWith(p + '/'))) return next();
+    res.sendFile(resolve(frontendDist, 'index.html'));
+  });
+  logger.info('Serving frontend', { from: frontendDist });
+}
 
 // 404 handler
 app.use((_req, res) => {

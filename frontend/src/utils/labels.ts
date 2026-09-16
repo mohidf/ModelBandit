@@ -28,10 +28,7 @@ export const TIER_LABEL: Record<ModelTier, string> = {
 };
 
 export const PROVIDER_LABEL: Record<string, string> = {
-  openai:    'OpenAI',
-  anthropic: 'Anthropic',
   openrouter: 'OpenRouter',
-  groq:       'Groq',
 };
 
 export function providerLabel(id: string): string {

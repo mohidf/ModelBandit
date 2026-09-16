@@ -1,27 +1,22 @@
 /**
  * routing.ts — the static routing table and the complexity → tier map.
  *
- * Both are plain data with no provider imports, so the browser demo can show
- * the same fallback decision the server makes when there is no performance
- * history for a task type. providers/index.ts wires this table to real
- * provider instances.
+ * Plain data with no provider imports, so the browser demo can show the same
+ * fallback decision the server makes when there is no performance history
+ * for a task type. Every model ID here must exist in config/models.ts.
  */
 
 import type { TaskDomain, TaskComplexity, ModelTier } from '../providers/types';
 
-/**
- * A single routing decision: which registered provider to use for a domain,
- * plus an optional fallback provider for cross-provider escalation.
- */
+/** Which model handles a task type at each tier, and where to go past premium. */
 export interface DomainRoute {
-  /** Must match IProvider.name of a registered provider. */
-  providerName: string;
+  models: Record<ModelTier, string>;
   /**
-   * Provider to escalate to when already at premium and confidence is low.
-   * If omitted or the same as providerName, cross-provider escalation is skipped.
+   * Model to try when the request is already at premium and classifier
+   * confidence is still low. Optional; without it there is nowhere to go.
    */
-  fallbackProviderName?: string;
-  /** Shown to the caller explaining why this provider was chosen. */
+  escalateTo?: string;
+  /** Shown to the caller explaining why this route exists. */
   reason: string;
 }
 
@@ -29,10 +24,10 @@ export interface DomainRoute {
 export type RoutingConfig = Record<TaskDomain, DomainRoute>;
 
 /**
- * Maps task complexity (classifier output) to provider tier (capability level).
+ * Maps task complexity (classifier output) to model tier (capability level).
  *
  * High complexity maps to `balanced` (not `premium`) so the strategy engine
- * accumulates data for balanced-tier models on first encounters. If classifier
+ * accumulates data for mid-tier models on first encounters. If classifier
  * confidence falls below `CONFIDENCE_THRESHOLD`, the escalation path promotes
  * to premium automatically. This prevents the cold-start problem where every
  * domain seeds only premium data, causing the strategy engine to exploit
@@ -44,82 +39,72 @@ export const COMPLEXITY_TO_TIER: Record<TaskComplexity, ModelTier> = {
   high:   'balanced',
 };
 
-/** Model each provider uses at each tier. Mirrors the register() calls in providers/index.ts. */
-export const PROVIDER_TIERS: Record<string, Record<ModelTier, string>> = {
-  openai: {
-    cheap:    'gpt-4o-mini',
-    balanced: 'gpt-4o-mini',  // OpenAI has no mid-tier model; escalation promotes to premium (gpt-4o)
-    premium:  'gpt-4o',
-  },
-  anthropic: {
-    cheap:    'claude-haiku-4-5-20251001',
-    balanced: 'claude-sonnet-4-6',
-    premium:  'claude-opus-4-6',
-  },
-  openrouter: {
-    cheap:    'meta-llama/llama-3.1-8b-instruct',
-    balanced: 'meta-llama/llama-3.3-70b-instruct',
-    premium:  'deepseek/deepseek-v3.2',
-  },
-};
+// The open-weight ladder most task types start on. Cheap enough that
+// exploration can afford to try alternatives.
+const OPEN = {
+  cheap:    'meta-llama/llama-3.1-8b-instruct',
+  balanced: 'meta-llama/llama-3.3-70b-instruct',
+  premium:  'deepseek/deepseek-v3.2',
+} as const;
 
-// OpenRouter is the default provider for most domains (open-weight models,
-// strong cost efficiency). OpenAI and Anthropic remain as fallbacks and
-// primary providers for domains where they clearly excel.
 export const ROUTING: RoutingConfig = {
   coding: {
-    providerName:         'openrouter',
-    fallbackProviderName: 'openai',
-    reason: 'OpenRouter Llama / DeepSeek for structured code generation',
-  },
-  math: {
-    providerName:         'openrouter',
-    fallbackProviderName: 'openai',
-    reason: 'OpenRouter Llama 70B / DeepSeek for mathematical reasoning',
-  },
-  creative: {
-    providerName:         'openrouter',
-    fallbackProviderName: 'anthropic',
-    reason: 'OpenRouter Llama 3.3 70B / Llama 3.1 8B for creative writing',
-  },
-  general: {
-    providerName:         'openrouter',
-    fallbackProviderName: 'openai',
-    reason: 'OpenRouter Llama 3.1 8B for cost-efficient general-purpose queries',
-  },
-  research: {
-    providerName:         'anthropic',
-    fallbackProviderName: 'openrouter',
-    reason: 'Claude excels at long-context research synthesis and citations',
-  },
-  summarization: {
-    providerName:         'openrouter',
-    fallbackProviderName: 'openai',
-    reason: 'OpenRouter Llama 3.1 8B for cost-effective text compression',
-  },
-  vision: {
-    providerName:         'openrouter',
-    fallbackProviderName: 'openai',
-    reason: 'OpenRouter Llama 4 Scout / Maverick for image and visual understanding',
+    models: OPEN, escalateTo: 'openai/gpt-4o',
+    reason: 'Llama for everyday code, DeepSeek for hard cases, GPT-4o if still unsure',
   },
   coding_debug: {
-    providerName:         'openrouter',
-    fallbackProviderName: 'openai',
-    reason: 'OpenRouter DeepSeek / Llama 70B for debugging and error analysis',
+    models: OPEN, escalateTo: 'openai/gpt-4o',
+    reason: 'DeepSeek and Llama 70B for debugging; GPT-4o as the last resort',
   },
-  general_chat: {
-    providerName:         'openrouter',
-    fallbackProviderName: 'openai',
-    reason: 'OpenRouter Llama 3.1 8B for low-latency conversational queries',
-  },
-  multilingual: {
-    providerName:         'openrouter',
-    fallbackProviderName: 'anthropic',
-    reason: 'OpenRouter Qwen 72B / Llama 70B with strong multilingual capabilities',
+  math: {
+    models: OPEN, escalateTo: 'openai/gpt-4o',
+    reason: 'Llama 70B and DeepSeek for math; GPT-4o if still unsure',
   },
   math_reasoning: {
-    providerName:         'openrouter',
-    fallbackProviderName: 'openai',
-    reason: 'OpenRouter Llama 3.3 70B / DeepSeek for chain-of-thought mathematical reasoning',
+    models: OPEN, escalateTo: 'openai/gpt-4o',
+    reason: 'Llama 70B and DeepSeek for step-by-step reasoning; GPT-4o if still unsure',
+  },
+  creative: {
+    models: OPEN, escalateTo: 'anthropic/claude-opus-4.6',
+    reason: 'Llama for creative writing; Claude Opus if still unsure',
+  },
+  research: {
+    models: {
+      cheap:    'anthropic/claude-haiku-4.5',
+      balanced: 'anthropic/claude-sonnet-4.6',
+      premium:  'anthropic/claude-opus-4.6',
+    },
+    escalateTo: 'openai/gpt-4o',
+    reason: 'Claude for long-context research synthesis and citations',
+  },
+  summarization: {
+    models: OPEN, escalateTo: 'openai/gpt-4o',
+    reason: 'Llama 8B for cost-effective text compression',
+  },
+  vision: {
+    models: {
+      cheap:    'openai/gpt-4o-mini',
+      balanced: 'meta-llama/llama-4-scout',
+      premium:  'meta-llama/llama-4-maverick',
+    },
+    escalateTo: 'openai/gpt-4o',
+    reason: 'Models that accept images: GPT-4o mini, Llama 4 Scout and Maverick',
+  },
+  general: {
+    models: OPEN, escalateTo: 'openai/gpt-4o',
+    reason: 'Llama 8B for cost-efficient general questions',
+  },
+  general_chat: {
+    models: OPEN, escalateTo: 'openai/gpt-4o-mini',
+    reason: 'Llama 8B for low-latency conversation',
+  },
+  multilingual: {
+    models: {
+      cheap:    'meta-llama/llama-3.1-8b-instruct',
+      balanced: 'qwen/qwen-2.5-72b-instruct',
+      premium:  'qwen/qwen3-235b-a22b',
+    },
+    escalateTo: 'anthropic/claude-sonnet-4.6',
+    reason: 'Qwen for its multilingual strength; Claude Sonnet if still unsure',
   },
 };

@@ -2,52 +2,11 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { routingEngine } from '../services/router';
 import { requireAuth } from '../middleware/auth';
 import { getUserApiKeys } from '../services/userKeyService';
-import { groqProvider, GROQ_FREE_MODELS } from '../providers/groqProvider';
-import { hybridClassifier } from '../services/hybridClassifier';
-import type { RouteResponse, ModelSelection } from '../providers/types';
 import { config } from '../config';
 
 const router = Router();
 
-/** Env vars that let the server route with its own keys for users who saved none. */
-const SERVER_PROVIDER_KEYS = ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'] as const;
 
-// ---------------------------------------------------------------------------
-// Free-tier handler — called when the user has no stored API keys.
-// Classifies the prompt and dispatches directly to Groq using the system key.
-// ---------------------------------------------------------------------------
-
-async function routeFreeTier(prompt: string, maxTokens: number): Promise<RouteResponse> {
-  const classification = await hybridClassifier.classify(prompt);
-  const { complexity } = classification;
-
-  const tier  = complexity === 'high' ? 'premium' : complexity === 'medium' ? 'balanced' : 'cheap';
-  const model = GROQ_FREE_MODELS[tier];
-
-  const result = await groqProvider.generate(prompt, model, { tier, maxTokens });
-  const cost   = groqProvider.estimateCost(model, tier, result.inputTokens, result.outputTokens);
-
-  const modelSelection: ModelSelection = {
-    provider:        'groq',
-    model,
-    tier,
-    reason:          'Free tier — Groq Llama model',
-    modelConfidence: result.modelConfidence,
-  };
-
-  return {
-    classification,
-    initialModel:     modelSelection,
-    finalModel:       modelSelection,
-    escalated:        false,
-    response:         result.text,
-    latencyMs:        result.latencyMs,
-    totalCostUsd:     cost.totalCostUsd,
-    strategyMode:     'fallback',
-    evaluatedOptions: [],
-    freeTier:         true,
-  };
-}
 
 // ---------------------------------------------------------------------------
 // POST /route
@@ -76,29 +35,14 @@ router.post('/', requireAuth, async (req: Request, res: Response, next: NextFunc
   const userApiKeys = await getUserApiKeys(req.userId!);
   const hasUserKeys = Object.keys(userApiKeys).length > 0;
 
-  // No user keys. In order of preference:
-  //   1. the free Groq tier, if the server has a Groq key (a hosted deployment
-  //      that doesn't want strangers spending its provider keys),
-  //   2. full routing on the server's own provider keys (a self-hosted or
-  //      local run where the operator is the user),
-  //   3. otherwise there is nothing to call with.
-  if (!hasUserKeys) {
-    if (process.env.GROQ_API_KEY) {
-      try {
-        const result = await routeFreeTier(prompt, validatedMaxTokens);
-        res.status(200).json(result);
-      } catch (err) {
-        next(err);
-      }
-      return;
-    }
-    if (!SERVER_PROVIDER_KEYS.some(k => process.env[k])) {
-      res.status(403).json({
-        error:   'NO_KEYS',
-        message: 'You have not added any API keys. Go to Settings to add your keys.',
-      });
-      return;
-    }
+  // A user with no saved key routes on the server's own OpenRouter key.
+  // With neither there is nothing to call with.
+  if (!hasUserKeys && !process.env.OPENROUTER_API_KEY) {
+    res.status(403).json({
+      error:   'NO_KEYS',
+      message: 'You have not added an API key. Go to Settings to add your OpenRouter key.',
+    });
+    return;
   }
 
   try {

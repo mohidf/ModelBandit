@@ -98,8 +98,7 @@ describe('GET /keys', () => {
 
   it('returns masked keys — never actual key values', async () => {
     setupSelectMock([
-      { provider: 'openai',    updatedAt: new Date('2025-01-01T00:00:00Z') },
-      { provider: 'anthropic', updatedAt: new Date('2025-01-02T00:00:00Z') },
+      { provider: 'openrouter', updatedAt: new Date('2025-01-01T00:00:00Z') },
     ]);
 
     const res = await request(app)
@@ -107,7 +106,7 @@ describe('GET /keys', () => {
       .set('Authorization', 'Bearer valid-token');
 
     expect(res.status).toBe(200);
-    expect(res.body.keys).toHaveLength(2);
+    expect(res.body.keys).toHaveLength(1);
 
     // Verify masking — real key must never appear
     for (const k of res.body.keys) {
@@ -117,9 +116,8 @@ describe('GET /keys', () => {
     }
 
     // Verify provider and updatedAt are present
-    expect(res.body.keys[0].provider).toBe('openai');
+    expect(res.body.keys[0].provider).toBe('openrouter');
     expect(res.body.keys[0].updatedAt).toBeDefined();
-    expect(res.body.keys[1].provider).toBe('anthropic');
   });
 });
 
@@ -137,7 +135,7 @@ describe('POST /keys', () => {
     mockUserId = undefined;
     const res = await request(app)
       .post('/keys')
-      .send({ provider: 'openai', apiKey: 'sk-valid-key-12345' });
+      .send({ provider: 'openrouter', apiKey: 'sk-valid-key-12345' });
     expect(res.status).toBe(401);
   });
 
@@ -166,7 +164,7 @@ describe('POST /keys', () => {
     const res = await request(app)
       .post('/keys')
       .set('Authorization', 'Bearer valid-token')
-      .send({ provider: 'openai', apiKey: 'short' });
+      .send({ provider: 'openrouter', apiKey: 'short' });
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/apiKey/i);
@@ -176,7 +174,7 @@ describe('POST /keys', () => {
     const res = await request(app)
       .post('/keys')
       .set('Authorization', 'Bearer valid-token')
-      .send({ provider: 'openai', apiKey: 12345678 });
+      .send({ provider: 'openrouter', apiKey: 12345678 });
 
     expect(res.status).toBe(400);
   });
@@ -187,14 +185,14 @@ describe('POST /keys', () => {
     const res = await request(app)
       .post('/keys')
       .set('Authorization', 'Bearer valid-token')
-      .send({ provider: 'openai', apiKey: 'sk-valid-key-12345' });
+      .send({ provider: 'openrouter', apiKey: 'sk-valid-key-12345' });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true });
   });
 
   it('accepts all valid provider values', async () => {
-    const validProviders = ['openai', 'anthropic', 'openrouter'];
+    const validProviders = ['openrouter'];
     for (const provider of validProviders) {
       setupUpsertMock();
       const res = await request(app)
@@ -211,7 +209,7 @@ describe('POST /keys', () => {
     const res = await request(app)
       .post('/keys')
       .set('Authorization', 'Bearer valid-token')
-      .send({ provider: 'anthropic', apiKey: 'sk-ant-valid-key-12345' });
+      .send({ provider: 'openrouter', apiKey: 'sk-ant-valid-key-12345' });
 
     expect(res.status).toBe(500);
   });
@@ -229,7 +227,7 @@ describe('DELETE /keys/:provider', () => {
 
   it('returns 401 without authentication', async () => {
     mockUserId = undefined;
-    const res = await request(app).delete('/keys/openai');
+    const res = await request(app).delete('/keys/openrouter');
     expect(res.status).toBe(401);
   });
 
@@ -246,7 +244,7 @@ describe('DELETE /keys/:provider', () => {
     setupDeleteMock();
 
     const res = await request(app)
-      .delete('/keys/openai')
+      .delete('/keys/openrouter')
       .set('Authorization', 'Bearer valid-token');
 
     expect(res.status).toBe(200);
@@ -257,7 +255,7 @@ describe('DELETE /keys/:provider', () => {
     setupDeleteMock({ message: 'DB error' });
 
     const res = await request(app)
-      .delete('/keys/anthropic')
+      .delete('/keys/openrouter')
       .set('Authorization', 'Bearer valid-token');
 
     expect(res.status).toBe(500);

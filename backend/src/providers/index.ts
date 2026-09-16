@@ -1,44 +1,19 @@
 /**
  * providers/index.ts — Composition root for the provider layer.
  *
- * This is the only file that imports concrete provider classes.
- * Everything else depends on IProvider (interface) or the providerManager
- * singleton exported here.
- *
- * ┌─────────────────────────────────────────────────────────────────────────┐
- * │  To change which provider handles a domain  → edit ROUTING below        │
- * │  To change a model at a tier               → edit the register() call   │
- * │  To add a new provider                     → implement IProvider,       │
- * │                                              register here              │
- * └─────────────────────────────────────────────────────────────────────────┘
+ * Every model goes through OpenRouter, including the OpenAI and Anthropic
+ * ones, so there is one provider class and one API key. The routing table
+ * (config/routing.ts) and the model registry (config/models.ts) are plain
+ * data; this file is the only place that touches a provider instance.
  */
 
 import { ProviderManager }    from './providerManager';
-import { ROUTING, PROVIDER_TIERS } from '../config/routing';
-import { claudeProvider }     from './claudeProvider';
-import { openaiProvider }     from './openaiProvider';
 import { openrouterProvider } from './openrouterProvider';
+import { ROUTING }            from '../config/routing';
 
-// Routing configuration lives in config/routing.ts (plain data, no provider
-// imports) so the browser demo can show the same fallback decisions.
-
-export const providerManager = new ProviderManager(ROUTING)
-  .register(openaiProvider,   PROVIDER_TIERS.openai)
-  .register(claudeProvider,   PROVIDER_TIERS.anthropic)
-  .register(openrouterProvider, PROVIDER_TIERS.openrouter);
-
-// ---------------------------------------------------------------------------
-// Re-exports — consumers import everything they need from 'providers'
-// ---------------------------------------------------------------------------
+export const providerManager = new ProviderManager(ROUTING).register(openrouterProvider);
 
 export { ProviderManager } from './providerManager';
-export type {
-  ResolvedModel,
-  DispatchResult,
-  ModelTierMap,
-  RoutingConfig,
-  DomainRoute,
-  ProviderInfo,
-} from './providerManager';
+export type { ResolvedModel, DispatchResult, RoutingConfig, DomainRoute } from './providerManager';
 export type { IProvider, GenerateOptions, GenerateResult, CostEstimate } from './baseProvider';
 export * from './types';

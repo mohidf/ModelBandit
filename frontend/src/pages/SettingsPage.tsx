@@ -8,9 +8,7 @@ interface StoredKey { provider: string; maskedKey: string; updatedAt: string; }
 interface RowState { value: string; busy: boolean; message: string | null; failed: boolean; }
 
 const PROVIDERS: { id: string; label: string; note: string }[] = [
-  { id: 'openai',    label: 'OpenAI',      note: 'Also used for the embedding step of the classifier.' },
-  { id: 'anthropic', label: 'Anthropic',   note: 'Claude models. Used for research and as an escalation target.' },
-  { id: 'openrouter', label: 'OpenRouter',  note: 'Llama, Qwen and DeepSeek through one key. The default for most task types.' },
+  { id: 'openrouter', label: 'OpenRouter', note: 'One key for every model the router can pick: Llama, Qwen, DeepSeek, GPT-4o and Claude.' },
 ];
 
 const EMPTY: RowState = { value: '', busy: false, message: null, failed: false };
@@ -119,9 +117,8 @@ export function SettingsPage() {
         </button>
       </div>
       <p className="page-intro">
-        Keys are stored against your account and only sent to the provider they belong to. The server never
-        returns them to the browser once saved. A provider without a key falls back to the server's own key,
-        if one is configured.
+        Your key is stored against your account and only ever sent to OpenRouter. The server never returns
+        it to the browser once saved. Without one, requests use the server's own key.
       </p>
 
       {loadError && <div className="error" role="alert" style={{ marginBottom: 16 }}>{loadError}</div>}

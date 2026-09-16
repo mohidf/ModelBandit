@@ -13,14 +13,10 @@ interface Props {
 
 /** One or two sentences saying what the router did and why. */
 function decisionSummary(r: RouteResponse): string {
-  const { classification: c, initialModel: m, strategyMode, freeTier } = r;
+  const { classification: c, initialModel: m, strategyMode } = r;
   const what = `Classified as ${DOMAIN_LABEL[c.domain].toLowerCase()}, ${COMPLEXITY_LABEL[c.complexity]} complexity, ${pct(c.confidence)} confident.`;
 
-  if (freeTier) {
-    return `${what} You have no API keys saved, so this went to ${modelDisplayName(m.model)} on Groq's free tier.`;
-  }
-
-  const target = `${modelDisplayName(m.model)} (${providerLabel(m.provider)}, ${TIER_LABEL[m.tier]} tier)`;
+  const target = `${modelDisplayName(m.model)} (${TIER_LABEL[m.tier]} tier, via ${providerLabel(m.provider)})`;
   const why =
     strategyMode === 'exploitation' ? `It had the best score on past ${DOMAIN_LABEL[c.domain].toLowerCase()} requests.` :
     strategyMode === 'exploration'  ? `This was a random exploration pick, which happens on 10% of requests so the router keeps learning.` :

@@ -123,7 +123,7 @@ export class RoutingEngine {
     const effectiveComplexity = preferCost ? downgradedComplexity(complexity) : complexity;
     const decision = await strategyEngine.choose(domain, effectiveComplexity, overrideConfig);
 
-    // 2. Execute initial request (falls back to the domain's other provider if it fails)
+    // 2. Execute initial request (falls back to another model at the same tier if the call fails)
     const initialCall = await this.dispatchWithFallback(decision.resolved, domain, prompt, maxTokens, userApiKeys);
     const initial = initialCall.resolved;
     const { result: initialResult, cost: initialCost } = initialCall;
@@ -245,7 +245,7 @@ export class RoutingEngine {
   /**
    * Call the resolved provider. If the call itself fails (timeout, auth
    * error, out of credit, malformed response) rather than returning a weak
-   * answer, try the domain's fallback provider at the same tier once.
+   * answer, try a different model at the same tier once.
    *
    * The failed model is recorded with confidence 0 and escalated: true so its
    * running averages take a hit and the strategy engine steers away from it
@@ -268,9 +268,9 @@ export class RoutingEngine {
       const message = err instanceof Error ? err.message : String(err);
       if (!alt) throw err;
 
-      logger.warn('Provider call failed, using fallback provider', {
+      logger.warn('Model call failed, using fallback model', {
         domain, model: resolved.model, provider: resolved.provider.name,
-        fallback: alt.provider.name, error: message,
+        fallback: alt.model, error: message,
       });
       this.recordFailure(resolved, domain, Date.now() - start);
 

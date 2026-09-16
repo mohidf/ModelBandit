@@ -1,8 +1,11 @@
 /**
- * Where the backend lives. In dev this is the /api prefix that Vite proxies to
- * localhost:3000. In production set VITE_API_URL to the backend's public URL.
+ * Where the backend lives. In dev it's the /api prefix that Vite proxies to
+ * localhost:3000. When the backend serves the built frontend itself (the
+ * Docker image), VITE_API_URL is set to an empty string at build time and
+ * requests go to the same origin. A full URL also works.
  */
-export const API_BASE: string = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || '/api';
+const raw = import.meta.env.VITE_API_URL as string | undefined;
+export const API_BASE: string = raw === undefined ? '/api' : raw.replace(/\/$/, '');
 
 /** fetch() against the backend. The session cookie goes along automatically. */
 export async function api(path: string, init: RequestInit = {}): Promise<Response> {

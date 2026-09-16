@@ -11,7 +11,7 @@
 
 import type { TaskDomain, ModelTier } from '../providers/types';
 
-export type ProviderName = 'openai' | 'anthropic' | 'openrouter';
+export type ProviderName = 'openrouter';
 
 export interface ModelDescriptor {
   /** Canonical API model string (e.g. "meta-llama/Llama-3.3-70B-Instruct"). */
@@ -31,60 +31,57 @@ export interface ModelDescriptor {
 
 export const MODEL_REGISTRY: readonly ModelDescriptor[] = [
 
-  // ── OpenAI ────────────────────────────────────────────────────────────────
+  // ── OpenAI and Anthropic, via OpenRouter ──────────────────────────────────
 
   {
-    id:              'gpt-4o-mini',
-    provider:        'openai',
+    id:              'openai/gpt-4o-mini',
+    provider:        'openrouter',
     displayName:     'GPT-4o mini',
     tier:            'cheap',
     costPer1kTokens: { input: 0.00015, output: 0.0006 },
     contextWindow:   128_000,
-    strengths:       ['coding', 'general_chat', 'summarization'],
+    strengths:       ['coding', 'general_chat', 'summarization', 'vision'],
   },
   {
-    id:              'gpt-4o',
-    provider:        'openai',
+    id:              'openai/gpt-4o',
+    provider:        'openrouter',
     displayName:     'GPT-4o',
     tier:            'premium',
-    costPer1kTokens: { input: 0.005, output: 0.015 },
+    costPer1kTokens: { input: 0.0025, output: 0.01 },
     contextWindow:   128_000,
     strengths:       ['coding', 'coding_debug', 'math', 'research', 'vision'],
   },
-
-  // ── Anthropic ─────────────────────────────────────────────────────────────
-
   {
-    id:              'claude-haiku-4-5-20251001',
-    provider:        'anthropic',
-    displayName:     'Claude Haiku',
+    id:              'anthropic/claude-haiku-4.5',
+    provider:        'openrouter',
+    displayName:     'Claude Haiku 4.5',
     tier:            'cheap',
-    costPer1kTokens: { input: 0.00025, output: 0.00125 },
+    costPer1kTokens: { input: 0.001, output: 0.005 },
     contextWindow:   200_000,
-    strengths:       ['general_chat', 'summarization'],
+    strengths:       ['general_chat', 'summarization', 'research'],
   },
   {
-    id:              'claude-sonnet-4-6',
-    provider:        'anthropic',
-    displayName:     'Claude Sonnet',
+    id:              'anthropic/claude-sonnet-4.6',
+    provider:        'openrouter',
+    displayName:     'Claude Sonnet 4.6',
     tier:            'balanced',
     costPer1kTokens: { input: 0.003, output: 0.015 },
-    contextWindow:   200_000,
+    contextWindow:   1_000_000,
     strengths:       ['creative', 'research', 'multilingual'],
   },
   {
-    id:              'claude-opus-4-6',
-    provider:        'anthropic',
-    displayName:     'Claude Opus',
+    id:              'anthropic/claude-opus-4.6',
+    provider:        'openrouter',
+    displayName:     'Claude Opus 4.6',
     tier:            'premium',
-    costPer1kTokens: { input: 0.015, output: 0.075 },
-    contextWindow:   200_000,
+    costPer1kTokens: { input: 0.005, output: 0.025 },
+    contextWindow:   1_000_000,
     strengths:       ['creative', 'research', 'multilingual', 'coding'],
   },
 
-  // ── OpenRouter ────────────────────────────────────────────────────────────
+  // ── Open-weight models, via OpenRouter ────────────────────────────────────
   //
-  // Open-weight models through one key. IDs and prices are OpenRouter's
+  // One key for all of them. IDs and prices are OpenRouter's
   // (https://openrouter.ai/models). Prices are per 1 000 tokens, USD.
 
   {
@@ -95,15 +92,6 @@ export const MODEL_REGISTRY: readonly ModelDescriptor[] = [
     costPer1kTokens: { input: 0.00005, output: 0.00008 },
     contextWindow:   131_072,
     strengths:       ['general_chat', 'general', 'summarization'],
-  },
-  {
-    id:              'openai/gpt-oss-20b',
-    provider:        'openrouter',
-    displayName:     'GPT-OSS 20B',
-    tier:            'cheap',
-    costPer1kTokens: { input: 0.00003, output: 0.00013 },
-    contextWindow:   131_072,
-    strengths:       ['general', 'summarization', 'coding'],
   },
   {
     id:              'meta-llama/llama-3.3-70b-instruct',

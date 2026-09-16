@@ -14,7 +14,7 @@ import { listKeyProviders, upsertKey, deleteKey } from '../services/userKeyServi
 
 const router = Router();
 
-const VALID_PROVIDERS = new Set(['openai', 'anthropic', 'openrouter']);
+const VALID_PROVIDERS = new Set(['openrouter']);
 const API_KEY_MIN_LENGTH = 8;
 const MASKED_KEY = '••••••••••••';
 

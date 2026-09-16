@@ -4,7 +4,7 @@ import {
   DEFAULT_TASK_WEIGHTS, applyOverrides, scoreStats, compareScored,
   type OptimizationMode, type TaskWeights,
 } from '../../backend/src/services/scoring';
-import { ROUTING, COMPLEXITY_TO_TIER, PROVIDER_TIERS } from '../../backend/src/config/routing';
+import { ROUTING, COMPLEXITY_TO_TIER } from '../../backend/src/config/routing';
 import { getModelById } from '../../backend/src/config/models';
 import type { TaskDomain, ModelTier, TaskComplexity } from '../../backend/src/providers/types';
 import snapshot from './snapshot.json';
@@ -27,7 +27,6 @@ const DOMAIN_LABEL: Record<TaskDomain, string> = {
   summarization: 'summarization', vision: 'vision', multilingual: 'multilingual',
 };
 const TIER_LABEL: Record<ModelTier, string> = { cheap: 'cheap', balanced: 'mid', premium: 'premium' };
-const PROVIDER_LABEL: Record<string, string> = { openai: 'OpenAI', anthropic: 'Anthropic', openrouter: 'OpenRouter' };
 
 const EXAMPLES = [
   'Write a TypeScript function that debounces API calls with a configurable delay',
@@ -55,16 +54,15 @@ function esc(s: string): string {
 }
 function nextTier(t: ModelTier): ModelTier { return t === 'cheap' ? 'balanced' : 'premium'; }
 
-interface Pick { modelId: string; provider: string; tier: ModelTier; }
+interface Pick { modelId: string; tier: ModelTier; }
 
 function escalationTarget(pick: Pick, domain: TaskDomain): Pick | null {
   const route = ROUTING[domain];
   if (pick.tier !== 'premium') {
     const tier = nextTier(pick.tier);
-    return { provider: pick.provider, tier, modelId: PROVIDER_TIERS[pick.provider][tier] };
+    return { tier, modelId: route.models[tier] };
   }
-  const fb = route.fallbackProviderName;
-  if (fb && fb !== pick.provider) return { provider: fb, tier: 'premium', modelId: PROVIDER_TIERS[fb].premium };
+  if (route.escalateTo && route.escalateTo !== pick.modelId) return { tier: 'premium', modelId: route.escalateTo };
   return null;
 }
 
@@ -122,10 +120,9 @@ function renderDecision(domain: TaskDomain, complexity: TaskComplexity, confiden
 
   if (rows.length > 0) {
     const top = rows[0];
-    pick = { modelId: top.modelId, provider: top.provider, tier: top.tier };
+    pick = { modelId: top.modelId, tier: top.tier };
     lead = `There is history for ${DOMAIN_LABEL[domain]} prompts, so every model with a row is scored and
-      <strong>${modelName(top.modelId)}</strong> (${PROVIDER_LABEL[top.provider] ?? top.provider},
-      ${TIER_LABEL[top.tier]} tier) wins. On the live server, ${Math.round(EPSILON * 100)}% of requests
+      <strong>${modelName(top.modelId)}</strong> (${TIER_LABEL[top.tier]} tier) wins. On the live server, ${Math.round(EPSILON * 100)}% of requests
       skip this and try a random model instead, so it keeps learning.`;
     table = `<div class="table-wrap"><table>
       <thead><tr><th>Model</th><th>Tier</th><th class="r">Quality</th><th class="r">Latency</th>
@@ -147,12 +144,11 @@ function renderDecision(domain: TaskDomain, complexity: TaskComplexity, confiden
       Weights for ${DOMAIN_LABEL[domain]}${mode === 'balanced' ? '' : ` with "${mode === 'cost' ? 'cheapest that works' : 'best answer'}"`}:
       ${weightsLine(weights)}.</p>`;
   } else {
-    const provider = ROUTING[domain].providerName;
     const tier = COMPLEXITY_TO_TIER[complexity];
-    pick = { provider, tier, modelId: PROVIDER_TIERS[provider][tier] };
+    pick = { tier, modelId: ROUTING[domain].models[tier] };
     lead = `There is no history for ${DOMAIN_LABEL[domain]} prompts yet, so the static table decides:
-      ${DOMAIN_LABEL[domain]} goes to ${PROVIDER_LABEL[provider] ?? provider}, and ${complexity} complexity
-      means the ${TIER_LABEL[tier]} tier. That is <strong>${modelName(pick.modelId)}</strong>.
+      ${complexity} complexity means the ${TIER_LABEL[tier]} tier, and for ${DOMAIN_LABEL[domain]} that is
+      <strong>${modelName(pick.modelId)}</strong>.
       <span class="muted">(${esc(ROUTING[domain].reason)}.)</span>`;
   }
 
@@ -162,10 +158,9 @@ function renderDecision(domain: TaskDomain, complexity: TaskComplexity, confiden
     escalation = target
       ? `<p class="note">Confidence ${pct(confidence)} is under the ${pct(CONFIDENCE_THRESHOLD)} threshold, so after
          the first answer comes back the request would run again on ${modelName(target.modelId)}
-         (${PROVIDER_LABEL[target.provider] ?? target.provider}, ${TIER_LABEL[target.tier]} tier), and both calls
-         would be recorded.</p>`
+         (${TIER_LABEL[target.tier]} tier), and both calls would be recorded.</p>`
       : `<p class="note">Confidence ${pct(confidence)} is under the ${pct(CONFIDENCE_THRESHOLD)} threshold, but this is
-         already the top tier with no fallback provider, so there is nowhere to escalate to.</p>`;
+         already the last model on the ladder, so there is nowhere to escalate to.</p>`;
   }
 
   return `<div class="box">
