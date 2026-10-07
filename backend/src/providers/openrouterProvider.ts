@@ -92,7 +92,12 @@ export class OpenRouterProvider implements IProvider {
         throw new Error(`OpenRouterProvider: request to ${model} timed out after ${TIMEOUT_MS} ms`);
       }
       if (err instanceof OpenAI.APIError) {
-        throw new Error(`OpenRouterProvider [${model}]: API error ${err.status} — ${err.message}`);
+        // Keep the status so callers can tell a bad key or empty account
+        // (401/402/403/429) from a model that failed.
+        throw Object.assign(
+          new Error(`OpenRouterProvider [${model}]: API error ${err.status} — ${err.message}`),
+          { status: err.status },
+        );
       }
       throw err;
     } finally {

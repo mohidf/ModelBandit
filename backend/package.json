@@ -15,6 +15,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "benchmark": "ts-node src/scripts/benchmark.ts",
+    "calibrate": "ts-node src/scripts/calibrate.ts",
     "reset:stats": "ts-node src/scripts/resetStats.ts",
     "export:snapshot": "ts-node src/scripts/exportSnapshot.ts"
   },

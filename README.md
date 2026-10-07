@@ -254,7 +254,7 @@ the rest to 200.
 cd backend && npm test
 ```
 
-155 tests. The classifier ones are mostly prompts I got wrong at some point
+189 tests. The classifier ones are mostly prompts I got wrong at some point
 pinned so they stay right: "create a bar chart with D3" is code, not vision;
 "explain how hash maps work" is general, not code; "in the history of
 computing" is not research.
@@ -262,10 +262,21 @@ computing" is not research.
 `npm run export:snapshot` copies the live performance table into the browser
 demo so it ranks models with current numbers.
 
+The router only tries a model it has no history for 10% of the time, so the
+table fills in slowly. `npm run calibrate` fixes that: it sends labelled prompts
+to every cheap, mid and premium model on every task type (165 calls by default,
+about $0.28 worst case at the same 1024-token limit real requests use, capped at
+$1) and records each result the way the router does. A bad key, an empty account
+or three failures in a row stop the run instead of recording junk.
+`npm run calibrate -- --dry-run` prints the plan and its cost without calling
+anything; `--per-arm`, `--tasks`, `--max-tokens` and `--max-usd` change it. Run it, then `npm run export:snapshot`, and the demo has a real ranking for
+every task type.
+
 There's also `npm run benchmark`, which sends 50 labelled prompts through a
 running backend and reports classification accuracy split by whether the prompt
 has obvious keywords or not, what it cost against sending everything to GPT-4o,
-and latency percentiles. It needs real keys and takes a few minutes.
+and latency percentiles. It signs in as `BENCHMARK_EMAIL` / `BENCHMARK_PASSWORD`
+(an account on that backend), needs real keys, and takes a few minutes.
 
 ## How the code is laid out
 
@@ -295,7 +306,8 @@ backend/src/
   lib/auth.ts                  Better Auth config (email + password, cookie sessions)
   middleware/                  auth (session lookup), rate limiter, error handler, logger
   routes/                      route, performance, metrics, history, keys
-  scripts/benchmark.ts         the 50-prompt benchmark
+  scripts/benchmark.ts         the 50-prompt benchmark (prompts in benchmarkPrompts.ts)
+  scripts/calibrate.ts         samples every routing-table model per task type to seed the table
   __tests__/                   Jest
 backend/drizzle/               SQL migrations generated from the schema, plus the EMA function
 
