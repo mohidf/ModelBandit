@@ -3,6 +3,7 @@ import type { InsightsResponse, TaskInsight, TaskDomain } from '../types';
 import { ALL_DOMAINS } from '../types';
 import { modelDisplayName } from '../utils/modelDisplay';
 import { DOMAIN_LABEL, TIER_LABEL, pct, ms, usd } from '../utils/labels';
+import { api } from '../lib/api';
 
 function DomainTable({ domain, insight }: { domain: TaskDomain; insight: TaskInsight }) {
   const requests = insight.all.reduce((s, x) => s + x.totalRequests, 0);
@@ -60,7 +61,7 @@ export default function InsightsPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res  = await fetch('/api/performance');
+      const res  = await api('/performance');
       const body = await res.json();
       if (!res.ok) setError(body.error ?? `Server returned ${res.status}`);
       else setInsights(body as InsightsResponse);

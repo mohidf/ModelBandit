@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { MetricsSnapshot } from '../types';
 import { modelDisplayName } from '../utils/modelDisplay';
 import { ms, usd } from '../utils/labels';
+import { api } from '../lib/api';
 
 function Stat({ k, v }: { k: string; v: string }) {
   return (
@@ -21,7 +22,7 @@ export default function MetricsPanel() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/metrics');
+      const res = await api('/metrics');
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       setData(await res.json() as MetricsSnapshot);
     } catch (e) {
